@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
 
 	"github.com/crazmoe/bt-headset-hid/internal/hfp"
@@ -95,6 +96,11 @@ func Serve(conn *dbus.Conn, onEvent func(hfp.Event)) (*Server, error) {
 	if err := conn.Export(objectManager{s}, RootPath, ifaceObjMgr); err != nil {
 		return nil, err
 	}
+	for _, p := range staticPaths {
+		if err := s.exportIntrospectable(p); err != nil {
+			return nil, err
+		}
+	}
 	reply, err := conn.RequestName(Service, dbus.NameFlagDoNotQueue)
 	if err != nil {
 		return nil, fmt.Errorf("modem: request name: %w", err)
@@ -143,7 +149,8 @@ func (s *Server) publish(sigs []Signal) error {
 			delete(s.callProps, path)
 			s.modem.SetMust(ifaceVoice, "Calls", s.callPaths())
 			errs = append(errs, s.conn.Emit(ModemPath, ifaceVoice+".CallDeleted", path))
-			errs = append(errs, s.conn.Export(nil, path, ifaceCall), s.conn.Export(nil, path, ifaceProps))
+			errs = append(errs, s.conn.Export(nil, path, ifaceCall), s.conn.Export(nil, path, ifaceProps),
+				s.conn.Export(nil, path, introspect.IntrospectData.Name))
 		}
 	}
 	return errors.Join(errs...)
@@ -162,6 +169,9 @@ func (s *Server) exportCall(c Call) error {
 		return err
 	}
 	if err := s.conn.Export(call{s, path}, path, ifaceCall); err != nil {
+		return err
+	}
+	if err := s.exportIntrospectable(path); err != nil {
 		return err
 	}
 	s.callProps[path] = p

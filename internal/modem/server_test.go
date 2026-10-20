@@ -2,10 +2,12 @@ package modem
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/godbus/dbus/v5/introspect"
 
 	"github.com/crazmoe/bt-headset-hid/internal/dbustest"
 	"github.com/crazmoe/bt-headset-hid/internal/hfp"
@@ -122,5 +124,56 @@ func TestNameTaken(t *testing.T) {
 	}
 	if _, err := Serve(dbustest.Connect(t, addr), nil); !errors.Is(err, ErrNameTaken) {
 		t.Fatalf("second Serve: %v", err)
+	}
+}
+
+// TestIntrospection walks the tree from "/" the way busctl tree does.
+func TestIntrospection(t *testing.T) {
+	addr := dbustest.Bus(t)
+	srv, err := Serve(dbustest.Connect(t, addr), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.SetState(hfp.Incoming); err != nil {
+		t.Fatal(err)
+	}
+	cl := dbustest.Connect(t, addr)
+	found := map[dbus.ObjectPath][]string{}
+	var walk func(p dbus.ObjectPath)
+	walk = func(p dbus.ObjectPath) {
+		n, err := introspect.Call(cl.Object(Service, p))
+		if err != nil {
+			t.Fatalf("introspect %s: %v", p, err)
+		}
+		for _, i := range n.Interfaces {
+			found[p] = append(found[p], i.Name)
+		}
+		for _, c := range n.Children {
+			child := p + "/" + dbus.ObjectPath(c.Name)
+			if p == "/" {
+				child = "/" + dbus.ObjectPath(c.Name)
+			}
+			walk(child)
+		}
+	}
+	walk("/")
+	want := map[dbus.ObjectPath][]string{
+		RootPath:          {introspect.IntrospectData.Name, ifaceObjMgr},
+		ModemPath:         {introspect.IntrospectData.Name, ifaceProps, ifaceModem, iface3gpp, ifaceVoice},
+		CallPrefix + "/1": {introspect.IntrospectData.Name, ifaceProps, ifaceCall},
+	}
+	for p, ifaces := range want {
+		if !reflect.DeepEqual(found[p], ifaces) {
+			t.Errorf("%s: interfaces %v, want %v", p, found[p], ifaces)
+		}
+	}
+
+	// A deleted call disappears from the tree.
+	if err := srv.SetState(hfp.Idle); err != nil {
+		t.Fatal(err)
+	}
+	n, err := introspect.Call(cl.Object(Service, CallPrefix))
+	if err != nil || len(n.Children) != 0 {
+		t.Fatalf("calls after hang-up: %+v, %v", n, err)
 	}
 }
