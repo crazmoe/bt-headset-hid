@@ -47,9 +47,9 @@ func runInstall(args []string, uninstall bool) error {
 	}
 	if mode == "pipewire" {
 		out, _ := exec.Command("pipewire", "--version").CombinedOutput()
-		switch err := install.CheckPipeWire(string(out)); {
+		switch err := install.CheckPipeWire(string(out), ""); {
 		case errors.Is(err, install.ErrPipeWireTooOld):
-			return fmt.Errorf("%v.\nUse \"sudo bt-headset-hid install -mode hfp\" or update PipeWire (see README)", err)
+			return fmt.Errorf("%v.\nUse \"sudo bt-headset-hid install -mode hfp\", update PipeWire or run the fix (see README)", err)
 		case err != nil:
 			fmt.Println("WARNING:", err, "- -mode pipewire needs PipeWire 1.2 or later")
 		}

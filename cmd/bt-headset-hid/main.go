@@ -60,8 +60,8 @@ func main() {
 	logger := log.New(os.Stderr, "", 0)
 	if daemon.Mode(*mode) == daemon.ModePipeWire {
 		out, _ := exec.Command("pipewire", "--version").CombinedOutput()
-		if err := install.CheckPipeWire(string(out)); errors.Is(err, install.ErrPipeWireTooOld) {
-			logger.Printf("WARNING: %v; use -mode hfp", err)
+		if err := install.CheckPipeWire(string(out), ""); errors.Is(err, install.ErrPipeWireTooOld) {
+			logger.Printf("WARNING: %v; or use -mode hfp", err)
 		}
 	}
 	err := daemon.Run(ctx, daemon.Config{
