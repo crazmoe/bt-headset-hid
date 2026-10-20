@@ -25,9 +25,10 @@ HFP. So you choose:
 
 Use `pipewire` if you want to talk through the headset, which is what a dongle does. It needs
 **PipeWire 1.2 or later** (`pipewire --version`): older versions, e.g. 1.0.x in Ubuntu 24.04 and
-distributions based on it, ignore incoming calls from a modem, so the headset neither rings nor
+distributions based on it, crash on incoming calls from a modem, so the headset neither rings nor
 answers. There use `hfp`, or a newer PipeWire (for Ubuntu e.g. from
-`ppa:pipewire-debian/pipewire-upstream`). `install` warns about an old version.
+`ppa:pipewire-debian/pipewire-upstream`). `install` refuses `-mode pipewire`
+with an older version.
 
 ## Setup
 
@@ -113,8 +114,8 @@ when it sees the hook switch.
   file, wrong directory, or WirePlumber not restarted. Also check that neither PulseAudio
   (`pactl info | grep "Server Name"` must name PipeWire) nor oFono/hsphfpd
   (`systemctl status ofono hsphfpd`) is running. Then `sudo systemctl restart bt-headset-hid`.
-- `RFCOMM receive command but modem not available` in the WirePlumber log, or the headset does not
-  ring in `-mode pipewire`: check `pipewire --version` (1.2 or later needed, see above), then
+- `RFCOMM receive command but modem not available` or `dbus_message_get_path() were incorrect` in
+  the WirePlumber log, the system sound icon vanishes briefly, or the headset does not ring in `-mode pipewire`: check `pipewire --version` (1.2 or later needed, see above), then
   restart WirePlumber (`systemctl --user restart wireplumber`).
 - Buttons do nothing in `-mode pipewire`: check that the WirePlumber configuration is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
