@@ -177,3 +177,31 @@ func TestIntrospection(t *testing.T) {
 		t.Fatalf("calls after hang-up: %+v, %v", n, err)
 	}
 }
+
+// TestInterfacesAddedOnRestart: PipeWire 1.0 only learns about a modem that
+// appears after its start from InterfacesAdded, e.g. when the daemon restarts.
+func TestInterfacesAddedOnRestart(t *testing.T) {
+	addr := dbustest.Bus(t)
+	pw := dbustest.Connect(t, addr)
+	if err := pw.AddMatchSignal(dbus.WithMatchSender(Service), dbus.WithMatchInterface(ifaceObjMgr), dbus.WithMatchMember("InterfacesAdded")); err != nil {
+		t.Fatal(err)
+	}
+	sigs := make(chan *dbus.Signal, 4)
+	pw.Signal(sigs)
+
+	for i := 0; i < 2; i++ {
+		conn := dbustest.Connect(t, addr)
+		if _, err := Serve(conn, nil); err != nil {
+			t.Fatal(err)
+		}
+		s := nextSignal(t, sigs, ifaceObjMgr+".InterfacesAdded")
+		if s.Path != RootPath || len(s.Body) != 2 || s.Body[0] != ModemPath {
+			t.Fatalf("InterfacesAdded %v %v", s.Path, s.Body)
+		}
+		ifaces, ok := s.Body[1].(map[string]map[string]dbus.Variant)
+		if !ok || ifaces[ifaceModem] == nil || ifaces[iface3gpp] == nil || ifaces[ifaceVoice] == nil {
+			t.Fatalf("interfaces %#v", s.Body[1])
+		}
+		conn.Close() // the daemon stops; the name goes away
+	}
+}

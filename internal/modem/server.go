@@ -108,6 +108,16 @@ func Serve(conn *dbus.Conn, onEvent func(hfp.Event)) (*Server, error) {
 	if reply != dbus.RequestNameReplyPrimaryOwner {
 		return nil, ErrNameTaken
 	}
+	// Like the real ModemManager when a modem shows up. PipeWire (at least
+	// 1.0) does not call GetManagedObjects again when the name reappears,
+	// so without this a restart of the daemon leaves PipeWire without modem.
+	ifaces, derr := s.modemInterfaces()
+	if derr != nil {
+		return nil, derr
+	}
+	if err := conn.Emit(RootPath, ifaceObjMgr+".InterfacesAdded", ModemPath, ifaces); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -251,13 +261,9 @@ func (o objectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[s
 	o.s.mu.Lock()
 	defer o.s.mu.Unlock()
 	objs := map[dbus.ObjectPath]map[string]map[string]dbus.Variant{}
-	modem := map[string]map[string]dbus.Variant{}
-	for _, iface := range []string{ifaceModem, iface3gpp, ifaceVoice} {
-		all, err := o.s.modem.GetAll(iface)
-		if err != nil {
-			return nil, err
-		}
-		modem[iface] = all
+	modem, err := o.s.modemInterfaces()
+	if err != nil {
+		return nil, err
 	}
 	objs[ModemPath] = modem
 	for path, p := range o.s.callProps {
@@ -268,4 +274,17 @@ func (o objectManager) GetManagedObjects() (map[dbus.ObjectPath]map[string]map[s
 		objs[path] = map[string]map[string]dbus.Variant{ifaceCall: all}
 	}
 	return objs, nil
+}
+
+// modemInterfaces returns the interfaces and properties of the modem object.
+func (s *Server) modemInterfaces() (map[string]map[string]dbus.Variant, *dbus.Error) {
+	modem := map[string]map[string]dbus.Variant{}
+	for _, iface := range []string{ifaceModem, iface3gpp, ifaceVoice} {
+		all, err := s.modem.GetAll(iface)
+		if err != nil {
+			return nil, err
+		}
+		modem[iface] = all
+	}
+	return modem, nil
 }
