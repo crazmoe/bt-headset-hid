@@ -40,4 +40,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/* --verify-tag --title "$TAG" --generate-notes
+        # 0.x versions and tags like v1.0.0-rc1 are marked as pre-release.
+        run: |
+          set -eu
+          pre=""
+          case "$TAG" in v0.*|*-*) pre="--prerelease" ;; esac
+          gh release create "$TAG" dist/* --verify-tag --title "$TAG" --generate-notes $pre
