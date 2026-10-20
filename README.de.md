@@ -27,63 +27,54 @@ Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem
 
 ## Einrichtung
 
-Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber, root für die Installation.
+Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber und Go zum Bauen.
 
-1. **Bauen und installieren**
+1. **Bauen**
 
    ```
    go build ./cmd/bt-headset-hid
-   sudo install bt-headset-hid /usr/local/bin/
    ```
 
-2. **PipeWire einrichten**: die passende Datei für deinen Modus kopieren und neu starten:
+2. **Installieren**, als dein normaler Desktop-Benutzer mit `sudo`:
 
    ```
-   mkdir -p ~/.config/wireplumber/wireplumber.conf.d
-   cp contrib/wireplumber/51-bt-headset-hid-pipewire.conf ~/.config/wireplumber/wireplumber.conf.d/51-bt-headset-hid.conf
-   # oder für -mode hfp: contrib/wireplumber/51-bt-headset-hid-hfp.conf
-   systemctl --user restart wireplumber pipewire pipewire-pulse
+   sudo ./bt-headset-hid install
    ```
 
-   Das gilt für WirePlumber 0.5 und neuer (`wireplumber --version`). WirePlumber 0.4 ignoriert
-   diese Dateien; dann stattdessen die `.lua`-Dateien aus `contrib/wireplumber/` nach
-   `~/.config/wireplumber/bluetooth.lua.d/51-bt-headset-hid.lua` kopieren. Als normaler
-   Benutzer kopieren, nicht mit `sudo`.
+   Der Befehl fragt nach dem Modus (oder `-mode pipewire` / `-mode hfp` angeben) und richtet dann
+   alles ein: das Programm in `/usr/local/bin`, das Kernelmodul `uhid`, die udev-Regel, damit
+   Softphones das Gerät öffnen dürfen, den systemd-Dienst mit dem gewählten Modus, bei `pipewire`
+   die D-Bus-Policy und das Abschalten von ModemManager, und die WirePlumber-Konfiguration deines
+   Benutzers (0.4 oder 0.5, wird automatisch erkannt). Zum Moduswechsel einfach erneut ausführen;
+   `sudo bt-headset-hid uninstall` entfernt alles wieder.
 
-3. **Nur für `-mode pipewire`**: Der echte ModemManager darf nicht laufen (Mobilfunkmodems gehen
-   dann nicht, solange bt-headset-hid läuft), und der Daemon braucht die Erlaubnis für dessen
-   Busnamen:
+3. **Headset verbinden** wie gewohnt (`bluetoothctl` oder über den Desktop; war es schon
+   verbunden, neu verbinden) und in `journalctl -u bt-headset-hid -f` auf „headset … connected“
+   achten. Bei `-mode pipewire` für Anrufe das Profil „Headset Head Unit (HSP/HFP)“ wählen oder
+   WirePlumber automatisch umschalten lassen, wenn das Softphone das Mikrofon öffnet.
 
-   ```
-   sudo systemctl disable --now ModemManager
-   sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/
-   ```
-
-   PipeWire muss mit ModemManager-Unterstützung gebaut sein (bei den meisten Distributionen der Fall).
-
-4. **Deinem Benutzer Zugriff auf das HID-Gerät geben**, damit Softphones es öffnen können:
-
-   ```
-   sudo cp contrib/udev/70-bt-headset-hid.rules /etc/udev/rules.d/
-   sudo udevadm control --reload
-   ```
-
-5. **Daemon starten**. Er läuft als root, weil er das Gerät über `/dev/uhid` anlegt:
-
-   ```
-   sudo cp contrib/systemd/bt-headset-hid.service /etc/systemd/system/
-   # für -mode hfp dort ExecStart anpassen
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now bt-headset-hid
-   journalctl -u bt-headset-hid -f
-   ```
-
-6. **Headset koppeln und verbinden** wie gewohnt (`bluetoothctl` oder über den Desktop). Bei
-   `-mode pipewire` für Anrufe das Profil „Headset Head Unit (HSP/HFP)“ wählen oder WirePlumber
-   automatisch umschalten lassen, wenn das Softphone das Mikrofon öffnet.
-
-7. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Browser-Apps fragen einmal nach
+4. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Browser-Apps fragen einmal nach
    dem WebHID-Zugriff.
+
+### Einrichtung von Hand
+
+Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
+
+- `sudo install bt-headset-hid /usr/local/bin/`
+- PipeWire: `bt-headset-hid wireplumber -mode pipewire` (oder `-mode hfp`) als normaler Benutzer.
+  Das erkennt die WirePlumber-Version, schreibt die passende Datei (0.4: Lua in
+  `~/.config/wireplumber/bluetooth.lua.d/`, ab 0.5: `~/.config/wireplumber/wireplumber.conf.d/`),
+  entfernt die Datei der jeweils anderen Version und startet PipeWire neu; `-remove` macht es
+  rückgängig. Von Hand: die passende Datei aus `contrib/wireplumber/` an den Pfad kopieren, der in
+  ihren ersten Zeilen steht.
+- Nur für `-mode pipewire`: `sudo systemctl disable --now ModemManager` (Mobilfunkmodems gehen
+  nicht, solange bt-headset-hid läuft) und
+  `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire muss mit
+  ModemManager-Unterstützung gebaut sein (bei den meisten Distributionen der Fall).
+- `sudo cp contrib/udev/70-bt-headset-hid.rules /etc/udev/rules.d/ && sudo udevadm control --reload`
+- `echo uhid | sudo tee /etc/modules-load.d/bt-headset-hid.conf && sudo modprobe uhid`
+- `sudo cp contrib/systemd/bt-headset-hid.service /etc/systemd/system/` (`-mode` in `ExecStart`
+  anpassen), dann `sudo systemctl daemon-reload && sudo systemctl enable --now bt-headset-hid`.
 
 ### Test ohne Softphone
 
@@ -103,13 +94,13 @@ sobald es den Hook Switch sieht.
 
 ### Fehlersuche
 
-- `org.freedesktop.ModemManager1 is already owned`: ModemManager läuft noch (Schritt 3).
+- `org.freedesktop.ModemManager1 is already owned`: ModemManager läuft noch (`install` mit `-mode pipewire` erledigt das).
 - `UUID already registered` oder `already provides the HFP/HSP Audio Gateway` bei `-mode hfp`:
-  Ein anderes Programm belegt HFP noch. Meist ist Schritt 2 nicht aktiv: Datei für die falsche
+  Ein anderes Programm belegt HFP noch. Meist ist die WirePlumber-Konfiguration nicht aktiv: Datei für die falsche
   WirePlumber-Version, falsches Verzeichnis oder WirePlumber nicht neu gestartet. Außerdem
   prüfen, dass weder PulseAudio (`pactl info | grep "Server Name"` muss PipeWire nennen) noch
   oFono/hsphfpd (`systemctl status ofono hsphfpd`) läuft. Danach `sudo systemctl restart bt-headset-hid`.
-- Tasten tun nichts bei `-mode pipewire`: prüfen, ob Schritt 2 aktiv ist
+- Tasten tun nichts bei `-mode pipewire`: prüfen, ob die WirePlumber-Konfiguration aktiv ist
   (`wpctl status`, `journalctl --user -u wireplumber`), und das Headset neu verbinden.
 - `create HID device: open /dev/uhid`: Der Daemon läuft nicht als root, oder das Kernelmodul
   `uhid` fehlt (`sudo modprobe uhid`).
