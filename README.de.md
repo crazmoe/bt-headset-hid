@@ -27,7 +27,7 @@ Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem
 
 ## Einrichtung
 
-Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber 0.5 oder neuer, root für die Installation.
+Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber, root für die Installation.
 
 1. **Bauen und installieren**
 
@@ -42,8 +42,13 @@ Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber 0.5 oder neuer, root 
    mkdir -p ~/.config/wireplumber/wireplumber.conf.d
    cp contrib/wireplumber/51-bt-headset-hid-pipewire.conf ~/.config/wireplumber/wireplumber.conf.d/51-bt-headset-hid.conf
    # oder für -mode hfp: contrib/wireplumber/51-bt-headset-hid-hfp.conf
-   systemctl --user restart wireplumber pipewire
+   systemctl --user restart wireplumber pipewire pipewire-pulse
    ```
+
+   Das gilt für WirePlumber 0.5 und neuer (`wireplumber --version`). WirePlumber 0.4 ignoriert
+   diese Dateien; dann stattdessen die `.lua`-Dateien aus `contrib/wireplumber/` nach
+   `~/.config/wireplumber/bluetooth.lua.d/51-bt-headset-hid.lua` kopieren. Als normaler
+   Benutzer kopieren, nicht mit `sudo`.
 
 3. **Nur für `-mode pipewire`**: Der echte ModemManager darf nicht laufen (Mobilfunkmodems gehen
    dann nicht, solange bt-headset-hid läuft), und der Daemon braucht die Erlaubnis für dessen
@@ -83,6 +88,11 @@ Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber 0.5 oder neuer, root 
 ### Fehlersuche
 
 - `org.freedesktop.ModemManager1 is already owned`: ModemManager läuft noch (Schritt 3).
+- `UUID already registered` oder `already provides the HFP/HSP Audio Gateway` bei `-mode hfp`:
+  Ein anderes Programm belegt HFP noch. Meist ist Schritt 2 nicht aktiv: Datei für die falsche
+  WirePlumber-Version, falsches Verzeichnis oder WirePlumber nicht neu gestartet. Außerdem
+  prüfen, dass weder PulseAudio (`pactl info | grep "Server Name"` muss PipeWire nennen) noch
+  oFono/hsphfpd (`systemctl status ofono hsphfpd`) läuft. Danach `sudo systemctl restart bt-headset-hid`.
 - Tasten tun nichts bei `-mode pipewire`: prüfen, ob Schritt 2 aktiv ist
   (`wpctl status`, `journalctl --user -u wireplumber`), und das Headset neu verbinden.
 - `create HID device: open /dev/uhid`: Der Daemon läuft nicht als root, oder das Kernelmodul

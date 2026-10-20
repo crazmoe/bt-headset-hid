@@ -27,7 +27,7 @@ Use `pipewire` if you want to talk through the headset, which is what a dongle d
 
 ## Setup
 
-Requirements: Linux with BlueZ, PipeWire with WirePlumber 0.5 or later, root for installing.
+Requirements: Linux with BlueZ, PipeWire with WirePlumber, root for installing.
 
 1. **Build and install**
 
@@ -42,8 +42,13 @@ Requirements: Linux with BlueZ, PipeWire with WirePlumber 0.5 or later, root for
    mkdir -p ~/.config/wireplumber/wireplumber.conf.d
    cp contrib/wireplumber/51-bt-headset-hid-pipewire.conf ~/.config/wireplumber/wireplumber.conf.d/51-bt-headset-hid.conf
    # or, for -mode hfp: contrib/wireplumber/51-bt-headset-hid-hfp.conf
-   systemctl --user restart wireplumber pipewire
+   systemctl --user restart wireplumber pipewire pipewire-pulse
    ```
+
+   This is for WirePlumber 0.5 and later (`wireplumber --version`). WirePlumber 0.4 ignores
+   these files; use the `.lua` files from `contrib/wireplumber/` in
+   `~/.config/wireplumber/bluetooth.lua.d/51-bt-headset-hid.lua` instead. Copy as your normal
+   user, not with `sudo`.
 
 3. **Only for `-mode pipewire`**: the real ModemManager must not run (you lose mobile broadband
    modems while bt-headset-hid runs), and the daemon needs permission to take its bus name:
@@ -82,6 +87,11 @@ Requirements: Linux with BlueZ, PipeWire with WirePlumber 0.5 or later, root for
 ### Troubleshooting
 
 - `org.freedesktop.ModemManager1 is already owned`: ModemManager is still running (step 3).
+- `UUID already registered` or `already provides the HFP/HSP Audio Gateway` in `-mode hfp`:
+  another program still owns HFP. Usually step 2 is not active: wrong WirePlumber version of the
+  file, wrong directory, or WirePlumber not restarted. Also check that neither PulseAudio
+  (`pactl info | grep "Server Name"` must name PipeWire) nor oFono/hsphfpd
+  (`systemctl status ofono hsphfpd`) is running. Then `sudo systemctl restart bt-headset-hid`.
 - Buttons do nothing in `-mode pipewire`: check that step 2 is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
 - `create HID device: open /dev/uhid`: the daemon is not running as root, or the `uhid` kernel

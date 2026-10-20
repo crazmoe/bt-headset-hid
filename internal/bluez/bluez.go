@@ -55,6 +55,20 @@ func spec(p hfp.Profile, features int) profileSpec {
 	}
 }
 
+// ErrProfileInUse means another program already registered the Audio
+// Gateway profile with BlueZ, usually PipeWire, PulseAudio or oFono.
+var ErrProfileInUse = errors.New("another program (usually PipeWire) already provides the HFP/HSP Audio Gateway; " +
+	"disable it there (WirePlumber: bluez5.roles without hfp_ag/hsp_ag, see README) or use -mode pipewire")
+
+func isAlreadyExists(err error) bool {
+	var e dbus.Error
+	if errors.As(err, &e) && e.Name == "org.bluez.Error.AlreadyExists" {
+		return true
+	}
+	// Older BlueZ versions only say so in the message.
+	return strings.Contains(err.Error(), "already registered")
+}
+
 // Connection is a headset that connected to one of our profiles.
 type Connection struct {
 	Device  dbus.ObjectPath // e.g. /org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF
@@ -115,6 +129,9 @@ func Register(conn *dbus.Conn, features int, profiles ...hfp.Profile) (*Profiles
 		err := conn.Object(service, managerPath).Call(ifaceManager+".RegisterProfile", 0, sp.path, sp.uuid, opts).Err
 		if err != nil {
 			ps.Close()
+			if isAlreadyExists(err) {
+				err = ErrProfileInUse
+			}
 			return nil, fmt.Errorf("bluez: register %s: %w", sp.name, err)
 		}
 		ps.specs = append(ps.specs, sp)
