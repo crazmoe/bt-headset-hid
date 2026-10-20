@@ -38,3 +38,6 @@ switch follows the Off-Hook LED so the next button press toggles correctly.
 
 PipeWire/WirePlumber must not claim the HFP/HSP profiles
 (`bluez5.roles = [ a2dp_sink a2dp_source ]`), otherwise BlueZ refuses the registration.
+
+The daemon needs read/write access to `/dev/uhid` (root, or a udev rule granting it).
+`go test ./internal/uhid` creates a real device only when it has that access and skips the kernel test otherwise.
