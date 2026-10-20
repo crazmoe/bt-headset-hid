@@ -10,9 +10,9 @@ HID telephony device via `/dev/uhid` (visible as `/dev/hidrawN`).
 ## Development
 
 ```
-python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
-ruff check . && pytest
+go vet ./...
+go test -race ./...
+go build ./cmd/bt-headset-hid
 ```
 
 ## License

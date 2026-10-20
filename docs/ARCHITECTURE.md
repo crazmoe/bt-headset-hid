@@ -8,17 +8,17 @@ Headset --BT/RFCOMM--> BlueZ --fd--> bt-headset-hid --/dev/uhid--> /dev/hidrawN
                                      AT -> HID mapping (Telephony page 0x0B, Consumer page 0x0C)
 ```
 
-## Modules (planned)
+## Packages (planned, under `internal/`)
 
 | Module | Responsibility | I/O |
 |---|---|---|
-| `at_parser` | Split RFCOMM stream into AT lines, bounded length | none |
+| `atparser` | Split RFCOMM stream into AT lines, bounded length | none |
 | `slc` | HFP service-level-connection handshake replies (`BRSF`, `CIND`, `CMER`, `CHLD`) | none |
 | `mapping` | AT command -> HID input report (hook switch, mute, redial, volume) | none |
-| `hid_descriptor` | Report descriptor + report packing/unpacking | none |
+| `hiddesc` | Report descriptor + report packing/unpacking | none |
 | `uhid` | `/dev/uhid` create/input/output events | uhid |
 | `bluez` | Register HFP AG / HSP AG profiles via D-Bus, receive RFCOMM fds | D-Bus |
-| `daemon` | Wire everything together, asyncio loop | all |
+| `daemon` | Wire everything together (goroutines, context cancellation) | all |
 
 ## Prerequisites on the host
 
