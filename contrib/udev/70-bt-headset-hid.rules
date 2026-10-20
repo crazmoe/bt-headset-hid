@@ -1,0 +1,4 @@
+# Gives the logged-in user access to the virtual device's /dev/hidrawN, so
+# softphones (Chrome/Edge WebHID, Teams, Zoom, ...) can use it.
+# 0005 = Bluetooth bus, 1209:0001 = default -vendor/-product of bt-headset-hid.
+SUBSYSTEM=="hidraw", KERNELS=="0005:1209:0001.*", TAG+="uaccess"

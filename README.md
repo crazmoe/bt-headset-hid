@@ -3,19 +3,102 @@
 **English** · [Deutsch](README.de.md)
 
 Makes the buttons of a Bluetooth headset (e.g. Jabra) usable like a USB headset dongle:
-the daemon acts as HFP/HSP Audio Gateway, receives the headset's AT commands
-(`ATA`, `AT+CHUP`, `AT+CKPD=200`, `AT+BLDN`, `AT+VGS`, ...) and exposes them as a virtual
-HID telephony device via `/dev/uhid` (visible as `/dev/hidrawN`).
+softphones (Teams, Zoom, browser apps via WebHID, ...) see a HID telephony device
+(`/dev/hidrawN`, created via `/dev/uhid`) that reports answer and hang-up from the
+headset and receives the ring and off-hook state from the softphone.
 
-**Status:** project scaffold, not functional yet. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Status:** feature complete, not yet tested with real hardware.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
+
+## Two modes
+
+Telephone audio and the headset buttons both travel over HFP, and only one program can own
+HFP. So you choose:
+
+| | `-mode pipewire` (default) | `-mode hfp` |
+|---|---|---|
+| Who owns HFP | PipeWire | bt-headset-hid |
+| Call audio (headset mic and speaker) | yes | no (A2DP music only) |
+| Answer / hang up / reject | yes | yes |
+| Redial, volume keys, HSP button | no | yes |
+| How it works | bt-headset-hid poses as a ModemManager modem; PipeWire forwards `ATA`/`AT+CHUP` to it | bt-headset-hid registers the HFP/HSP Audio Gateway with BlueZ and parses the AT commands itself |
+
+Use `pipewire` if you want to talk through the headset, which is what a dongle does.
+
+## Setup
+
+Requirements: Linux with BlueZ, PipeWire with WirePlumber 0.5 or later, root for installing.
+
+1. **Build and install**
+
+   ```
+   go build ./cmd/bt-headset-hid
+   sudo install bt-headset-hid /usr/local/bin/
+   ```
+
+2. **Configure PipeWire** for your mode by copying the matching file and restarting it:
+
+   ```
+   mkdir -p ~/.config/wireplumber/wireplumber.conf.d
+   cp contrib/wireplumber/51-bt-headset-hid-pipewire.conf ~/.config/wireplumber/wireplumber.conf.d/51-bt-headset-hid.conf
+   # or, for -mode hfp: contrib/wireplumber/51-bt-headset-hid-hfp.conf
+   systemctl --user restart wireplumber pipewire
+   ```
+
+3. **Only for `-mode pipewire`**: the real ModemManager must not run (you lose mobile broadband
+   modems while bt-headset-hid runs), and the daemon needs permission to take its bus name:
+
+   ```
+   sudo systemctl disable --now ModemManager
+   sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/
+   ```
+
+   PipeWire must be built with ModemManager support (most distributions do this).
+
+4. **Give your user access to the HID device** so softphones can open it:
+
+   ```
+   sudo cp contrib/udev/70-bt-headset-hid.rules /etc/udev/rules.d/
+   sudo udevadm control --reload
+   ```
+
+5. **Start the daemon**. It runs as root, because it creates the device via `/dev/uhid`:
+
+   ```
+   sudo cp contrib/systemd/bt-headset-hid.service /etc/systemd/system/
+   # edit ExecStart there for -mode hfp
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now bt-headset-hid
+   journalctl -u bt-headset-hid -f
+   ```
+
+6. **Pair and connect the headset** as usual (`bluetoothctl` or your desktop). In `-mode pipewire`
+   pick the headset's "Headset Head Unit (HSP/HFP)" profile for calls, or let WirePlumber switch
+   automatically when the softphone opens the microphone.
+
+7. **Select the device in the softphone.** It is called `bt-headset-hid`. Browser apps ask for
+   WebHID access once.
+
+### Troubleshooting
+
+- `org.freedesktop.ModemManager1 is already owned`: ModemManager is still running (step 3).
+- Buttons do nothing in `-mode pipewire`: check that step 2 is active
+  (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
+- `create HID device: open /dev/uhid`: the daemon is not running as root, or the `uhid` kernel
+  module is missing (`sudo modprobe uhid`).
+- Some softphones only accept HID devices of known vendors; try `-vendor`/`-product` (and adjust
+  the udev rule).
 
 ## Development
 
 ```
+gofmt -l .
 go vet ./...
 go test -race ./...
 go build ./cmd/bt-headset-hid
 ```
+
+Tests that need `/dev/uhid` (root) or `dbus-daemon` are skipped where those are missing.
 
 ## License
 
