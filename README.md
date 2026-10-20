@@ -123,7 +123,8 @@ when it sees the hook switch.
   (`pactl info | grep "Server Name"` must name PipeWire) nor oFono/hsphfpd
   (`systemctl status ofono hsphfpd`) is running. Then `sudo systemctl restart bt-headset-hid`.
 - `RFCOMM receive command but modem not available` or `dbus_message_get_path() were incorrect` in
-  the WirePlumber log, the system sound icon vanishes briefly, or the headset does not ring in `-mode pipewire`: check `pipewire --version` (1.2 or later, or the fix script above), then
+  the WirePlumber log, the system sound icon vanishes briefly, or the headset does not ring in
+  `-mode pipewire`: check `pipewire --version` (1.2 or later, or the fix script above), then
   restart WirePlumber (`systemctl --user restart wireplumber`).
 - Buttons do nothing in `-mode pipewire`: check that the WirePlumber configuration is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
