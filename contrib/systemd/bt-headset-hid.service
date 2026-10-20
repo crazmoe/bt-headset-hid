@@ -4,7 +4,7 @@ After=bluetooth.service dbus.service
 Wants=bluetooth.service
 
 [Service]
-# Use -mode hfp for all buttons without call audio (see README).
+# Switch modes with "sudo bt-headset-hid install -mode hfp" (or pipewire).
 ExecStart=/usr/local/bin/bt-headset-hid -mode pipewire
 Restart=on-failure
 RestartSec=5

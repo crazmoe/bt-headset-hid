@@ -16,19 +16,27 @@ import (
 const version = "0.1.0"
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "wireplumber" {
-		err := runWirePlumber(os.Args[2:])
+	if len(os.Args) > 1 && (os.Args[1] == "wireplumber" || os.Args[1] == "install" || os.Args[1] == "uninstall") {
+		var err error
+		switch os.Args[1] {
+		case "wireplumber":
+			err = runWirePlumber(os.Args[2:])
+		default:
+			err = runInstall(os.Args[2:], os.Args[1] == "uninstall")
+		}
 		switch {
 		case err == flag.ErrHelp:
 		case err != nil:
-			fmt.Fprintln(os.Stderr, "bt-headset-hid wireplumber:", err)
+			fmt.Fprintf(os.Stderr, "bt-headset-hid %s: %v\n", os.Args[1], err)
 			os.Exit(1)
 		}
 		return
 	}
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: bt-headset-hid [flags]")
-		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode pipewire|hfp] [-remove]   (configure PipeWire, as your user)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid install [-mode pipewire|hfp]   (set up everything)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid uninstall")
+		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode pipewire|hfp] [-remove]   (only PipeWire, as your user)")
 		flag.PrintDefaults()
 	}
 	mode := flag.String("mode", string(daemon.ModePipeWire),

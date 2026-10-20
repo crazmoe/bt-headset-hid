@@ -27,61 +27,53 @@ Use `pipewire` if you want to talk through the headset, which is what a dongle d
 
 ## Setup
 
-Requirements: Linux with BlueZ, PipeWire with WirePlumber, root for installing.
+Requirements: Linux with BlueZ, PipeWire with WirePlumber, and Go to build.
 
-1. **Build and install**
+1. **Build**
 
    ```
    go build ./cmd/bt-headset-hid
-   sudo install bt-headset-hid /usr/local/bin/
    ```
 
-2. **Configure PipeWire** for your mode, as your normal user (not with `sudo`):
+2. **Install**, from your normal desktop user with `sudo`:
 
    ```
-   bt-headset-hid wireplumber -mode pipewire    # or: -mode hfp
+   sudo ./bt-headset-hid install
    ```
 
-   This detects the WirePlumber version, writes the matching file (0.4: Lua in
-   `~/.config/wireplumber/bluetooth.lua.d/`, 0.5 and later: `~/.config/wireplumber/wireplumber.conf.d/`),
-   removes the file of the other version and restarts PipeWire and WirePlumber.
-   `bt-headset-hid wireplumber -remove` undoes it. Run it again after switching modes or
-   upgrading WirePlumber. To do it by hand, copy the matching file from `contrib/wireplumber/`
-   to the path written in its first lines.
+   It asks for the mode (or pass `-mode pipewire` / `-mode hfp`) and then sets up everything:
+   the program in `/usr/local/bin`, the `uhid` kernel module, the udev rule that lets softphones
+   open the device, the systemd service with the chosen mode, for `pipewire` the D-Bus policy and
+   switching off ModemManager, and the WirePlumber configuration of your user (0.4 or 0.5,
+   detected automatically). Run it again to switch modes; `sudo bt-headset-hid uninstall`
+   removes everything.
 
-3. **Only for `-mode pipewire`**: the real ModemManager must not run (you lose mobile broadband
-   modems while bt-headset-hid runs), and the daemon needs permission to take its bus name:
+3. **Connect the headset** as usual (`bluetoothctl` or your desktop; reconnect it if it was
+   already connected) and watch `journalctl -u bt-headset-hid -f` for "headset … connected".
+   In `-mode pipewire` pick the headset's "Headset Head Unit (HSP/HFP)" profile for calls, or let
+   WirePlumber switch automatically when the softphone opens the microphone.
 
-   ```
-   sudo systemctl disable --now ModemManager
-   sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/
-   ```
-
-   PipeWire must be built with ModemManager support (most distributions do this).
-
-4. **Give your user access to the HID device** so softphones can open it:
-
-   ```
-   sudo cp contrib/udev/70-bt-headset-hid.rules /etc/udev/rules.d/
-   sudo udevadm control --reload
-   ```
-
-5. **Start the daemon**. It runs as root, because it creates the device via `/dev/uhid`:
-
-   ```
-   sudo cp contrib/systemd/bt-headset-hid.service /etc/systemd/system/
-   # edit ExecStart there for -mode hfp
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now bt-headset-hid
-   journalctl -u bt-headset-hid -f
-   ```
-
-6. **Pair and connect the headset** as usual (`bluetoothctl` or your desktop). In `-mode pipewire`
-   pick the headset's "Headset Head Unit (HSP/HFP)" profile for calls, or let WirePlumber switch
-   automatically when the softphone opens the microphone.
-
-7. **Select the device in the softphone.** It is called `bt-headset-hid`. Browser apps ask for
+4. **Select the device in the softphone.** It is called `bt-headset-hid`. Browser apps ask for
    WebHID access once.
+
+### Manual setup
+
+What `install` does, step by step, if you prefer to do it yourself:
+
+- `sudo install bt-headset-hid /usr/local/bin/`
+- PipeWire: `bt-headset-hid wireplumber -mode pipewire` (or `-mode hfp`) as your normal user.
+  It detects the WirePlumber version, writes the matching file (0.4: Lua in
+  `~/.config/wireplumber/bluetooth.lua.d/`, 0.5 and later: `~/.config/wireplumber/wireplumber.conf.d/`),
+  removes the file of the other version and restarts PipeWire; `-remove` undoes it. By hand: copy
+  the matching file from `contrib/wireplumber/` to the path written in its first lines.
+- Only for `-mode pipewire`: `sudo systemctl disable --now ModemManager` (mobile broadband modems
+  stop working while bt-headset-hid runs) and
+  `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire must be built with
+  ModemManager support (most distributions do this).
+- `sudo cp contrib/udev/70-bt-headset-hid.rules /etc/udev/rules.d/ && sudo udevadm control --reload`
+- `echo uhid | sudo tee /etc/modules-load.d/bt-headset-hid.conf && sudo modprobe uhid`
+- `sudo cp contrib/systemd/bt-headset-hid.service /etc/systemd/system/` (edit `-mode` in
+  `ExecStart`), then `sudo systemctl daemon-reload && sudo systemctl enable --now bt-headset-hid`.
 
 ### Testing without a softphone
 
@@ -101,13 +93,13 @@ when it sees the hook switch.
 
 ### Troubleshooting
 
-- `org.freedesktop.ModemManager1 is already owned`: ModemManager is still running (step 3).
+- `org.freedesktop.ModemManager1 is already owned`: ModemManager is still running (`install` with `-mode pipewire` does this).
 - `UUID already registered` or `already provides the HFP/HSP Audio Gateway` in `-mode hfp`:
-  another program still owns HFP. Usually step 2 is not active: wrong WirePlumber version of the
+  another program still owns HFP. Usually the WirePlumber configuration is not active: wrong WirePlumber version of the
   file, wrong directory, or WirePlumber not restarted. Also check that neither PulseAudio
   (`pactl info | grep "Server Name"` must name PipeWire) nor oFono/hsphfpd
   (`systemctl status ofono hsphfpd`) is running. Then `sudo systemctl restart bt-headset-hid`.
-- Buttons do nothing in `-mode pipewire`: check that step 2 is active
+- Buttons do nothing in `-mode pipewire`: check that the WirePlumber configuration is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
 - `create HID device: open /dev/uhid`: the daemon is not running as root, or the `uhid` kernel
   module is missing (`sudo modprobe uhid`).
