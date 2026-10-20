@@ -13,7 +13,8 @@ import (
 	"github.com/crazmoe/bt-headset-hid/internal/daemon"
 )
 
-const version = "0.1.0"
+// version is overridden at release build time with -ldflags "-X main.version=...".
+var version = "0.1.0"
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "wireplumber" || os.Args[1] == "install" || os.Args[1] == "uninstall") {

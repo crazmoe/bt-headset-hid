@@ -27,9 +27,19 @@ Use `pipewire` if you want to talk through the headset, which is what a dongle d
 
 ## Setup
 
-Requirements: Linux with BlueZ, PipeWire with WirePlumber, and Go to build.
+Requirements: Linux with BlueZ and PipeWire with WirePlumber.
 
-1. **Build**
+1. **Download or build**
+
+   Ready-made binaries for `amd64` and `arm64` are on the
+   [releases page](https://github.com/crazmoe/bt-headset-hid/releases). Unpack and change into the folder:
+
+   ```
+   tar xzf bt-headset-hid_*_linux_amd64.tar.gz
+   cd bt-headset-hid_*_linux_amd64
+   ```
+
+   Or build it yourself with Go:
 
    ```
    go build ./cmd/bt-headset-hid
