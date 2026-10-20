@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -42,6 +43,13 @@ func runInstall(args []string, uninstall bool) error {
 		var err error
 		if mode, err = askMode(os.Stdin); err != nil {
 			return err
+		}
+	}
+	if mode == "pipewire" {
+		out, _ := exec.Command("pipewire", "--version").CombinedOutput()
+		if err := install.CheckPipeWire(string(out)); err != nil {
+			fmt.Println("WARNING:", err)
+			fmt.Println("         Use \"sudo bt-headset-hid install -mode hfp\" or update PipeWire (see README).")
 		}
 	}
 	self, err := os.Executable()
