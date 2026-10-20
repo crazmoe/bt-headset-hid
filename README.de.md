@@ -27,9 +27,19 @@ Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem
 
 ## Einrichtung
 
-Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber und Go zum Bauen.
+Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
 
-1. **Bauen**
+1. **Herunterladen oder bauen**
+
+   Fertige Programme für `amd64` und `arm64` gibt es auf der
+   [Release-Seite](https://github.com/crazmoe/bt-headset-hid/releases). Entpacken und in den Ordner wechseln:
+
+   ```
+   tar xzf bt-headset-hid_*_linux_amd64.tar.gz
+   cd bt-headset-hid_*_linux_amd64
+   ```
+
+   Oder selbst mit Go bauen:
 
    ```
    go build ./cmd/bt-headset-hid
