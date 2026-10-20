@@ -23,7 +23,21 @@ belegen. Deshalb wählst du:
 | Wahlwiederholung, Lautstärketasten, HSP-Taste | nein | ja |
 | Funktionsweise | bt-headset-hid gibt sich als ModemManager-Modem aus; PipeWire leitet `ATA`/`AT+CHUP` daran weiter | bt-headset-hid registriert das HFP/HSP Audio Gateway bei BlueZ und wertet die AT-Befehle selbst aus |
 
-Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem Dongle.
+Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem Dongle. Dafür
+braucht es **PipeWire 1.2 oder neuer** (`pipewire --version`): Ältere Versionen, z. B. 1.0.x in
+Ubuntu 24.04 und darauf aufbauenden Distributionen, stürzen bei eingehenden Anrufen eines Modems ab,
+das Headset klingelt also nicht und kann nicht abnehmen, und `install` verweigert `-mode pipewire`.
+Dort `hfp` nehmen, ein neueres PipeWire, oder PipeWire 1.0.x unter Debian/Ubuntu mit dem
+mitgelieferten Skript korrigieren, als normaler Benutzer:
+
+```
+contrib/pipewire-1.0-fix.sh            # nur das Bluetooth-Plugin mit der Korrektur neu bauen
+contrib/pipewire-1.0-fix.sh --restore  # zurück zum Original-Plugin
+```
+
+Das Skript lädt die Quellen deiner PipeWire-Version, wendet die einzeilige Korrektur aus 1.2.0 an,
+baut nur `libspa-bluez5.so` und ersetzt die installierte Datei. Ein PipeWire-Update deiner
+Distribution überschreibt sie wieder; `install` merkt das und bittet, das Skript erneut auszuführen.
 
 ## Einrichtung
 
@@ -110,6 +124,10 @@ sobald es den Hook Switch sieht.
   WirePlumber-Version, falsches Verzeichnis oder WirePlumber nicht neu gestartet. Außerdem
   prüfen, dass weder PulseAudio (`pactl info | grep "Server Name"` muss PipeWire nennen) noch
   oFono/hsphfpd (`systemctl status ofono hsphfpd`) läuft. Danach `sudo systemctl restart bt-headset-hid`.
+- `RFCOMM receive command but modem not available` oder `dbus_message_get_path() were incorrect` im
+  WirePlumber-Log, das Lautsprechersymbol verschwindet kurz, oder das Headset klingelt bei
+  `-mode pipewire` nicht: `pipewire --version` prüfen (1.2 oder neuer nötig oder das Skript oben),
+  dann WirePlumber neu starten (`systemctl --user restart wireplumber`).
 - Tasten tun nichts bei `-mode pipewire`: prüfen, ob die WirePlumber-Konfiguration aktiv ist
   (`wpctl status`, `journalctl --user -u wireplumber`), und das Headset neu verbinden.
 - `create HID device: open /dev/uhid`: Der Daemon läuft nicht als root, oder das Kernelmodul

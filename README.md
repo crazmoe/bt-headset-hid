@@ -23,7 +23,20 @@ HFP. So you choose:
 | Redial, volume keys, HSP button | no | yes |
 | How it works | bt-headset-hid poses as a ModemManager modem; PipeWire forwards `ATA`/`AT+CHUP` to it | bt-headset-hid registers the HFP/HSP Audio Gateway with BlueZ and parses the AT commands itself |
 
-Use `pipewire` if you want to talk through the headset, which is what a dongle does.
+Use `pipewire` if you want to talk through the headset, which is what a dongle does. It needs
+**PipeWire 1.2 or later** (`pipewire --version`): older versions, e.g. 1.0.x in Ubuntu 24.04 and
+distributions based on it, crash on incoming calls from a modem, so the headset neither rings nor
+answers, and `install` refuses `-mode pipewire`. There use `hfp`, a newer PipeWire, or fix
+PipeWire 1.0.x on Debian/Ubuntu with the included script, as your normal user:
+
+```
+contrib/pipewire-1.0-fix.sh            # rebuild only the Bluetooth plugin with the fix
+contrib/pipewire-1.0-fix.sh --restore  # back to the original plugin
+```
+
+The script downloads the sources of your PipeWire version, applies the one-line fix from 1.2.0,
+builds only `libspa-bluez5.so` and replaces the installed file. A PipeWire update from your
+distribution overwrites it again; `install` notices that and asks you to rerun the script.
 
 ## Setup
 
@@ -109,6 +122,10 @@ when it sees the hook switch.
   file, wrong directory, or WirePlumber not restarted. Also check that neither PulseAudio
   (`pactl info | grep "Server Name"` must name PipeWire) nor oFono/hsphfpd
   (`systemctl status ofono hsphfpd`) is running. Then `sudo systemctl restart bt-headset-hid`.
+- `RFCOMM receive command but modem not available` or `dbus_message_get_path() were incorrect` in
+  the WirePlumber log, the system sound icon vanishes briefly, or the headset does not ring in
+  `-mode pipewire`: check `pipewire --version` (1.2 or later, or the fix script above), then
+  restart WirePlumber (`systemctl --user restart wireplumber`).
 - Buttons do nothing in `-mode pipewire`: check that the WirePlumber configuration is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
 - `create HID device: open /dev/uhid`: the daemon is not running as root, or the `uhid` kernel

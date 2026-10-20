@@ -3,14 +3,17 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
 	"github.com/crazmoe/bt-headset-hid/internal/daemon"
+	"github.com/crazmoe/bt-headset-hid/internal/install"
 )
 
 // version is overridden at release build time with -ldflags "-X main.version=...".
@@ -55,6 +58,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	logger := log.New(os.Stderr, "", 0)
+	if daemon.Mode(*mode) == daemon.ModePipeWire {
+		out, _ := exec.Command("pipewire", "--version").CombinedOutput()
+		if err := install.CheckPipeWire(string(out), ""); errors.Is(err, install.ErrPipeWireTooOld) {
+			logger.Printf("WARNING: %v; or use -mode hfp", err)
+		}
+	}
 	err := daemon.Run(ctx, daemon.Config{
 		Mode:    daemon.Mode(*mode),
 		Name:    *name,
