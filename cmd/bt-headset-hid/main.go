@@ -16,6 +16,21 @@ import (
 const version = "0.1.0"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "wireplumber" {
+		err := runWirePlumber(os.Args[2:])
+		switch {
+		case err == flag.ErrHelp:
+		case err != nil:
+			fmt.Fprintln(os.Stderr, "bt-headset-hid wireplumber:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	flag.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "usage: bt-headset-hid [flags]")
+		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode pipewire|hfp] [-remove]   (configure PipeWire, as your user)")
+		flag.PrintDefaults()
+	}
 	mode := flag.String("mode", string(daemon.ModePipeWire),
 		`"pipewire": PipeWire keeps HFP and the audio, answer/hang up only; "hfp": all buttons, no call audio`)
 	name := flag.String("name", "bt-headset-hid", "HID device name")

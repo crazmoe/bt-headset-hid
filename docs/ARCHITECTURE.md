@@ -37,6 +37,7 @@ Bluetooth device volume.
 | `modem` | ModemManager modem for PipeWire: call state logic (`Calls`, pure) and its D-Bus export (`Server`) | D-Bus |
 | `bluez` | Register HFP AG / HSP AG profiles via D-Bus, receive RFCOMM fds (mode hfp) | D-Bus |
 | `daemon` | Wire everything together: `Bridge` (mapping + HID device), `Session` (one headset in mode hfp), `Run` | all |
+| `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON | files |
 | `dbustest` | Private `dbus-daemon` for tests | process |
 
 ## HID reports

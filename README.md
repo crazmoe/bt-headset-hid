@@ -36,19 +36,18 @@ Requirements: Linux with BlueZ, PipeWire with WirePlumber, root for installing.
    sudo install bt-headset-hid /usr/local/bin/
    ```
 
-2. **Configure PipeWire** for your mode by copying the matching file and restarting it:
+2. **Configure PipeWire** for your mode, as your normal user (not with `sudo`):
 
    ```
-   mkdir -p ~/.config/wireplumber/wireplumber.conf.d
-   cp contrib/wireplumber/51-bt-headset-hid-pipewire.conf ~/.config/wireplumber/wireplumber.conf.d/51-bt-headset-hid.conf
-   # or, for -mode hfp: contrib/wireplumber/51-bt-headset-hid-hfp.conf
-   systemctl --user restart wireplumber pipewire pipewire-pulse
+   bt-headset-hid wireplumber -mode pipewire    # or: -mode hfp
    ```
 
-   This is for WirePlumber 0.5 and later (`wireplumber --version`). WirePlumber 0.4 ignores
-   these files; use the `.lua` files from `contrib/wireplumber/` in
-   `~/.config/wireplumber/bluetooth.lua.d/51-bt-headset-hid.lua` instead. Copy as your normal
-   user, not with `sudo`.
+   This detects the WirePlumber version, writes the matching file (0.4: Lua in
+   `~/.config/wireplumber/bluetooth.lua.d/`, 0.5 and later: `~/.config/wireplumber/wireplumber.conf.d/`),
+   removes the file of the other version and restarts PipeWire and WirePlumber.
+   `bt-headset-hid wireplumber -remove` undoes it. Run it again after switching modes or
+   upgrading WirePlumber. To do it by hand, copy the matching file from `contrib/wireplumber/`
+   to the path written in its first lines.
 
 3. **Only for `-mode pipewire`**: the real ModemManager must not run (you lose mobile broadband
    modems while bt-headset-hid runs), and the daemon needs permission to take its bus name:
