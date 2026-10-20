@@ -1,6 +1,7 @@
 package bluez
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"syscall"
@@ -24,6 +25,11 @@ type fakeManager struct {
 func (m *fakeManager) RegisterProfile(path dbus.ObjectPath, uuid string, opts map[string]dbus.Variant) *dbus.Error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	for _, u := range m.registered {
+		if u == uuid {
+			return dbus.NewError("org.bluez.Error.AlreadyExists", []any{"UUID already registered"})
+		}
+	}
 	m.registered[path] = uuid
 	m.opts[path] = opts
 	return nil
@@ -144,5 +150,18 @@ func TestRegisterFails(t *testing.T) {
 	// No BlueZ on the bus.
 	if _, err := Register(dbustest.Connect(t, addr), hfp.DefaultFeatures, hfp.HFP); err == nil {
 		t.Fatal("Register without BlueZ succeeded")
+	}
+}
+
+func TestProfileInUse(t *testing.T) {
+	addr := dbustest.Bus(t)
+	fakeBlueZ(t, addr)
+	// PipeWire got there first.
+	if _, err := Register(dbustest.Connect(t, addr), hfp.DefaultFeatures, hfp.HFP); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Register(dbustest.Connect(t, addr), hfp.DefaultFeatures, hfp.HFP, hfp.HSP)
+	if !errors.Is(err, ErrProfileInUse) {
+		t.Fatalf("second Register: %v", err)
 	}
 }

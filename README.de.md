@@ -27,7 +27,7 @@ Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem
 
 ## Einrichtung
 
-Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber 0.5 oder neuer, root für die Installation.
+Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber, root für die Installation.
 
 1. **Bauen und installieren**
 
@@ -42,8 +42,13 @@ Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber 0.5 oder neuer, root 
    mkdir -p ~/.config/wireplumber/wireplumber.conf.d
    cp contrib/wireplumber/51-bt-headset-hid-pipewire.conf ~/.config/wireplumber/wireplumber.conf.d/51-bt-headset-hid.conf
    # oder für -mode hfp: contrib/wireplumber/51-bt-headset-hid-hfp.conf
-   systemctl --user restart wireplumber pipewire
+   systemctl --user restart wireplumber pipewire pipewire-pulse
    ```
+
+   Das gilt für WirePlumber 0.5 und neuer (`wireplumber --version`). WirePlumber 0.4 ignoriert
+   diese Dateien; dann stattdessen die `.lua`-Dateien aus `contrib/wireplumber/` nach
+   `~/.config/wireplumber/bluetooth.lua.d/51-bt-headset-hid.lua` kopieren. Als normaler
+   Benutzer kopieren, nicht mit `sudo`.
 
 3. **Nur für `-mode pipewire`**: Der echte ModemManager darf nicht laufen (Mobilfunkmodems gehen
    dann nicht, solange bt-headset-hid läuft), und der Daemon braucht die Erlaubnis für dessen
@@ -80,9 +85,30 @@ Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber 0.5 oder neuer, root 
 7. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Browser-Apps fragen einmal nach
    dem WebHID-Zugriff.
 
+### Test ohne Softphone
+
+```
+grep -l bt-headset-hid /sys/class/hidraw/*/device/uevent    # z. B. .../hidraw5/...
+# Terminal 1: Eingabe-Reports anzeigen (hexdump puffert 16 Byte, Reports sind 2 Byte lang)
+sudo python3 -c 'import os; f=os.open("/dev/hidraw5", os.O_RDONLY); [print(os.read(f, 64).hex(" "), flush=True) for _ in iter(int, 1)]'
+# Terminal 2: das Softphone spielen
+printf '\x02\x02' | sudo tee /dev/hidraw5 >/dev/null   # Ring-LED: das Headset klingelt
+printf '\x02\x01' | sudo tee /dev/hidraw5 >/dev/null   # Off-Hook-LED: Anruf aktiv
+printf '\x02\x00' | sudo tee /dev/hidraw5 >/dev/null   # alle LEDs aus: kein Anruf
+```
+
+Annehmen am Headset zeigt `01 01` (Hook Switch an), Auflegen `01 00`. Wie bei einem USB-Dongle
+klingelt das Headset weiter, bis der Rechner die Off-Hook-LED setzt; ein Softphone macht das,
+sobald es den Hook Switch sieht.
+
 ### Fehlersuche
 
 - `org.freedesktop.ModemManager1 is already owned`: ModemManager läuft noch (Schritt 3).
+- `UUID already registered` oder `already provides the HFP/HSP Audio Gateway` bei `-mode hfp`:
+  Ein anderes Programm belegt HFP noch. Meist ist Schritt 2 nicht aktiv: Datei für die falsche
+  WirePlumber-Version, falsches Verzeichnis oder WirePlumber nicht neu gestartet. Außerdem
+  prüfen, dass weder PulseAudio (`pactl info | grep "Server Name"` muss PipeWire nennen) noch
+  oFono/hsphfpd (`systemctl status ofono hsphfpd`) läuft. Danach `sudo systemctl restart bt-headset-hid`.
 - Tasten tun nichts bei `-mode pipewire`: prüfen, ob Schritt 2 aktiv ist
   (`wpctl status`, `journalctl --user -u wireplumber`), und das Headset neu verbinden.
 - `create HID device: open /dev/uhid`: Der Daemon läuft nicht als root, oder das Kernelmodul
