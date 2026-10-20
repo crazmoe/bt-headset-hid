@@ -84,6 +84,22 @@ Requirements: Linux with BlueZ, PipeWire with WirePlumber, root for installing.
 7. **Select the device in the softphone.** It is called `bt-headset-hid`. Browser apps ask for
    WebHID access once.
 
+### Testing without a softphone
+
+```
+grep -l bt-headset-hid /sys/class/hidraw/*/device/uevent    # e.g. .../hidraw5/...
+# terminal 1: show input reports (hexdump buffers 16 bytes, reports are 2 bytes)
+sudo python3 -c 'import os; f=os.open("/dev/hidraw5", os.O_RDONLY); [print(os.read(f, 64).hex(" "), flush=True) for _ in iter(int, 1)]'
+# terminal 2: act as the softphone
+printf '\x02\x02' | sudo tee /dev/hidraw5 >/dev/null   # Ring LED: the headset rings
+printf '\x02\x01' | sudo tee /dev/hidraw5 >/dev/null   # Off-Hook LED: call active
+printf '\x02\x00' | sudo tee /dev/hidraw5 >/dev/null   # all LEDs off: idle
+```
+
+Answering on the headset shows `01 01` (hook switch on), hanging up `01 00`. Like with a USB
+dongle, the headset keeps ringing until the host sets the Off-Hook LED; a softphone does that
+when it sees the hook switch.
+
 ### Troubleshooting
 
 - `org.freedesktop.ModemManager1 is already owned`: ModemManager is still running (step 3).

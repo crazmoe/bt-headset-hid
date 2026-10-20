@@ -85,6 +85,22 @@ Voraussetzungen: Linux mit BlueZ, PipeWire mit WirePlumber, root für die Instal
 7. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Browser-Apps fragen einmal nach
    dem WebHID-Zugriff.
 
+### Test ohne Softphone
+
+```
+grep -l bt-headset-hid /sys/class/hidraw/*/device/uevent    # z. B. .../hidraw5/...
+# Terminal 1: Eingabe-Reports anzeigen (hexdump puffert 16 Byte, Reports sind 2 Byte lang)
+sudo python3 -c 'import os; f=os.open("/dev/hidraw5", os.O_RDONLY); [print(os.read(f, 64).hex(" "), flush=True) for _ in iter(int, 1)]'
+# Terminal 2: das Softphone spielen
+printf '\x02\x02' | sudo tee /dev/hidraw5 >/dev/null   # Ring-LED: das Headset klingelt
+printf '\x02\x01' | sudo tee /dev/hidraw5 >/dev/null   # Off-Hook-LED: Anruf aktiv
+printf '\x02\x00' | sudo tee /dev/hidraw5 >/dev/null   # alle LEDs aus: kein Anruf
+```
+
+Annehmen am Headset zeigt `01 01` (Hook Switch an), Auflegen `01 00`. Wie bei einem USB-Dongle
+klingelt das Headset weiter, bis der Rechner die Off-Hook-LED setzt; ein Softphone macht das,
+sobald es den Hook Switch sieht.
+
 ### Fehlersuche
 
 - `org.freedesktop.ModemManager1 is already owned`: ModemManager läuft noch (Schritt 3).
