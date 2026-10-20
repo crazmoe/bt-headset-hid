@@ -1,24 +1,43 @@
 # Architecture
 
+HFP carries both the call audio and the headset buttons, and only one program can own it.
+The daemon therefore has two modes (`-mode`); both end in the same HID device.
+
 ```
-Headset --BT/RFCOMM--> BlueZ --fd--> bt-headset-hid --/dev/uhid--> /dev/hidrawN
-                                          |
-                                     AT parser + SLC handshake (HFP/HSP Audio Gateway role)
-                                          |
-                                     AT -> HID mapping (Telephony page 0x0B, Consumer page 0x0C)
+mode pipewire (default, with call audio)
+
+Headset --HFP--> BlueZ --> PipeWire (audio, AT commands)
+                               | ATA / AT+CHUP -> Call.Accept / Call.Hangup (D-Bus)
+                               v
+                      bt-headset-hid as ModemManager modem --> mapping --> /dev/uhid --> /dev/hidrawN
+                               ^                                                          |
+                               +---- call state (RINGING_IN / ACTIVE) <---- LED reports --+
+
+mode hfp (all buttons, no call audio)
+
+Headset --HFP/HSP--> BlueZ --RFCOMM fd--> bt-headset-hid: AT parser + HFP AG --> mapping --> /dev/uhid
+                                                ^                                              |
+                                                +------ +CIEV / RING <------ LED reports ------+
 ```
 
-## Packages (planned, under `internal/`)
+In mode pipewire, PipeWire's native HFP backend talks to the first ModemManager modem when
+`bluez5.hfphsp-backend-native-modem` is set (see `spa/plugins/bluez5/modemmanager.c` in PipeWire).
+It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itself as the
+Bluetooth device volume.
 
-| Module | Responsibility | I/O |
+## Packages (under `internal/`)
+
+| Package | Responsibility | I/O |
 |---|---|---|
 | `atparser` | Split RFCOMM stream into AT lines, bounded length | none |
 | `hfp` | Audio Gateway state machine: SLC handshake (`BRSF`, `CIND`, `CMER`, `CHLD`), call state / `+CIEV`, button events (`ATA`, `CHUP`, `CKPD`, `BLDN`, `BVRA`, `VGS`/`VGM`) | none |
 | `mapping` | Headset event -> HID input reports (hook switch, drop, redial, volume); LED output report -> call state | none |
 | `hiddesc` | Report descriptor + report packing/unpacking | none |
 | `uhid` | `/dev/uhid` create/input/output events | uhid |
-| `bluez` | Register HFP AG / HSP AG profiles via D-Bus, receive RFCOMM fds | D-Bus |
-| `daemon` | Wire everything together (goroutines, context cancellation) | all |
+| `modem` | ModemManager modem for PipeWire: call state logic (`Calls`, pure) and its D-Bus export (`Server`) | D-Bus |
+| `bluez` | Register HFP AG / HSP AG profiles via D-Bus, receive RFCOMM fds (mode hfp) | D-Bus |
+| `daemon` | Wire everything together: `Bridge` (mapping + HID device), `Session` (one headset in mode hfp), `Run` | all |
+| `dbustest` | Private `dbus-daemon` for tests | process |
 
 ## HID reports
 
@@ -36,5 +55,11 @@ switch follows the Off-Hook LED so the next button press toggles correctly.
 
 ## Prerequisites on the host
 
-PipeWire/WirePlumber must not claim the HFP/HSP profiles
-(`bluez5.roles = [ a2dp_sink a2dp_source ]`), otherwise BlueZ refuses the registration.
+See the setup section of the [README](../README.md). In short: in mode pipewire, WirePlumber
+enables the modem link and ModemManager must not run; in mode hfp, PipeWire must not claim
+HFP/HSP (`bluez5.roles = [ a2dp_sink a2dp_source ]`), otherwise BlueZ refuses the registration.
+The daemon needs read/write access to `/dev/uhid` (root) and, in mode pipewire, a D-Bus policy
+that lets it own `org.freedesktop.ModemManager1` (`contrib/dbus/`).
+
+`go test ./internal/uhid` creates a real device only when it has access to `/dev/uhid`;
+the D-Bus tests start a private `dbus-daemon` and are skipped if it is not installed.
