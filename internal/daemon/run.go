@@ -86,6 +86,7 @@ func Run(ctx context.Context, cfg Config) error {
 		}
 		defer srv.Close()
 		b.OnState(func(s hfp.CallState) {
+			logf("call state: %v", s)
 			if err := srv.SetState(s); err != nil {
 				logf("modem: %v", err)
 			}

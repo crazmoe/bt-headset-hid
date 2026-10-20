@@ -97,6 +97,15 @@ const (
 	Active             // call in progress; the headset button hangs up
 )
 
+var stateNames = map[CallState]string{Idle: "idle", Incoming: "incoming", Outgoing: "outgoing", Active: "active"}
+
+func (s CallState) String() string {
+	if n, ok := stateNames[s]; ok {
+		return n
+	}
+	return "unknown"
+}
+
 // Indicator indices as announced in the +CIND test response (1-based).
 const (
 	indService   = 1
