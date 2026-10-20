@@ -1,53 +1,15 @@
 package modem
 
 import (
-	"bufio"
 	"errors"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/crazmoe/bt-headset-hid/internal/dbustest"
 	"github.com/crazmoe/bt-headset-hid/internal/hfp"
 )
-
-// privateBus starts a private session dbus-daemon and returns its address. Tests using it are skipped where dbus-daemon is missing.
-func privateBus(t *testing.T) string {
-	t.Helper()
-	bin, err := exec.LookPath("dbus-daemon")
-	if err != nil {
-		t.Skip("dbus-daemon not installed")
-	}
-	// The stock session configuration lets anyone own any name.
-	sock := filepath.Join(t.TempDir(), "bus")
-	cmd := exec.Command(bin, "--session", "--nofork", "--print-address", "--address=unix:path="+sock)
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
-	addr, err := bufio.NewReader(out).ReadString('\n')
-	if err != nil {
-		t.Fatalf("dbus-daemon address: %v", err)
-	}
-	return strings.TrimSpace(addr)
-}
-
-func connect(t *testing.T, addr string) *dbus.Conn {
-	t.Helper()
-	conn, err := dbus.Connect(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { conn.Close() })
-	return conn
-}
 
 func nextSignal(t *testing.T, ch <-chan *dbus.Signal, name string) *dbus.Signal {
 	t.Helper()
@@ -66,14 +28,14 @@ func nextSignal(t *testing.T, ch <-chan *dbus.Signal, name string) *dbus.Signal 
 
 // TestPipeWireView drives the server the way PipeWire's modemmanager.c does.
 func TestPipeWireView(t *testing.T) {
-	addr := privateBus(t)
+	addr := dbustest.Bus(t)
 	events := make(chan hfp.Event, 4)
-	srv, err := Serve(connect(t, addr), func(e hfp.Event) { events <- e })
+	srv, err := Serve(dbustest.Connect(t, addr), func(e hfp.Event) { events <- e })
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pw := connect(t, addr)
+	pw := dbustest.Connect(t, addr)
 	for _, member := range []string{"CallAdded", "CallDeleted"} {
 		if err := pw.AddMatchSignal(dbus.WithMatchSender(Service), dbus.WithMatchInterface(ifaceVoice), dbus.WithMatchMember(member)); err != nil {
 			t.Fatal(err)
@@ -154,11 +116,11 @@ func TestPipeWireView(t *testing.T) {
 }
 
 func TestNameTaken(t *testing.T) {
-	addr := privateBus(t)
-	if _, err := Serve(connect(t, addr), nil); err != nil {
+	addr := dbustest.Bus(t)
+	if _, err := Serve(dbustest.Connect(t, addr), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Serve(connect(t, addr), nil); !errors.Is(err, ErrNameTaken) {
+	if _, err := Serve(dbustest.Connect(t, addr), nil); !errors.Is(err, ErrNameTaken) {
 		t.Fatalf("second Serve: %v", err)
 	}
 }
