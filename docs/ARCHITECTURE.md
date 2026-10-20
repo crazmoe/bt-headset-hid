@@ -13,7 +13,7 @@ Headset --BT/RFCOMM--> BlueZ --fd--> bt-headset-hid --/dev/uhid--> /dev/hidrawN
 | Module | Responsibility | I/O |
 |---|---|---|
 | `atparser` | Split RFCOMM stream into AT lines, bounded length | none |
-| `slc` | HFP service-level-connection handshake replies (`BRSF`, `CIND`, `CMER`, `CHLD`) | none |
+| `hfp` | Audio Gateway state machine: SLC handshake (`BRSF`, `CIND`, `CMER`, `CHLD`), call state / `+CIEV`, button events (`ATA`, `CHUP`, `CKPD`, `BLDN`, `BVRA`, `VGS`/`VGM`) | none |
 | `mapping` | AT command -> HID input report (hook switch, mute, redial, volume) | none |
 | `hiddesc` | Report descriptor + report packing/unpacking | none |
 | `uhid` | `/dev/uhid` create/input/output events | uhid |
