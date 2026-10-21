@@ -118,11 +118,14 @@ func Run(ctx context.Context, cfg Config) error {
 			}
 			go w.Run(ctx)
 		}
-		b.OnState(func(s hfp.CallState) {
-			logf("call state: %v", s)
+		st := &settler{delay: time.Second, set: func(s hfp.CallState) {
 			if err := srv.SetState(s); err != nil {
 				logf("modem: %v", err)
 			}
+		}}
+		b.OnState(func(s hfp.CallState) {
+			logf("call state: %v", s)
+			st.SetState(s)
 		})
 		logf("serving %s for PipeWire", modem.Service)
 	case ModeHFP:

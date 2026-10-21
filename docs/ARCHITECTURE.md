@@ -25,6 +25,10 @@ In mode pipewire, PipeWire's native HFP backend talks to the first ModemManager 
 It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itself as the
 Bluetooth device volume.
 
+Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
+passes an Active that follows Idle on to the modem only after one second, and drops it when
+another state comes first, so the headset does not see a call that ends at once.
+
 Outside a call many headsets send their call button as AVRCP play/pause, which BlueZ turns into
 an input device "<name> (AVRCP)". With `-grab-media-keys` the daemon grabs that device exclusively
 (`EVIOCGRAB`) and feeds play/pause into the mapping as the HSP-style button, so the press reaches
