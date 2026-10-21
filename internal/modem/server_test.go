@@ -146,6 +146,9 @@ func TestIntrospection(t *testing.T) {
 			t.Fatalf("introspect %s: %v", p, err)
 		}
 		for _, i := range n.Interfaces {
+			if i.Name == "org.freedesktop.DBus.Peer" {
+				continue // added by godbus itself since v5.2
+			}
 			found[p] = append(found[p], i.Name)
 		}
 		for _, c := range n.Children {
