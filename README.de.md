@@ -21,6 +21,7 @@ belegen. Deshalb wählst du:
 | Telefon-Audio (Headset-Mikrofon und -Lautsprecher) | ja | nein (nur A2DP-Musik) |
 | Annehmen / Auflegen / Ablehnen | ja | ja |
 | Wahlwiederholung, Lautstärketasten, HSP-Taste | nein | ja |
+| Anruftaste ausserhalb eines Anrufs (AVRCP Play/Pause) | geht ans Softphone (`-keep-media-keys`: an den Medienplayer) | geht ans Softphone |
 | Funktionsweise | bt-headset-hid gibt sich als ModemManager-Modem aus; PipeWire leitet `ATA`/`AT+CHUP` daran weiter | bt-headset-hid registriert das HFP/HSP Audio Gateway bei BlueZ und wertet die AT-Befehle selbst aus |
 
 Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem Dongle. Dafür
@@ -128,6 +129,11 @@ sobald es den Hook Switch sieht.
   WirePlumber-Log, das Lautsprechersymbol verschwindet kurz, oder das Headset klingelt bei
   `-mode pipewire` nicht: `pipewire --version` prüfen (1.2 oder neuer nötig oder das Skript oben),
   dann WirePlumber neu starten (`systemctl --user restart wireplumber`).
+- Der Medienplayer reagiert bei `-mode pipewire` auf die Anruftaste: Im Journal sollte nach dem
+  Verbinden des Headsets `media keys of "<Headset> (AVRCP)" now go to the softphone` stehen. Bei
+  `-mode pipewire` übernimmt bt-headset-hid die AVRCP-Tasten des Headsets exklusiv, Play/Pause
+  wird so zur Anruftaste, und Vor/Zurück steuern vom Headset aus keine Musik mehr;
+  `-keep-media-keys` schaltet das ab.
 - Tasten tun nichts bei `-mode pipewire`: prüfen, ob die WirePlumber-Konfiguration aktiv ist
   (`wpctl status`, `journalctl --user -u wireplumber`), und das Headset neu verbinden.
 - `create HID device: open /dev/uhid`: Der Daemon läuft nicht als root, oder das Kernelmodul

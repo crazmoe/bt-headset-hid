@@ -21,6 +21,7 @@ HFP. So you choose:
 | Call audio (headset mic and speaker) | yes | no (A2DP music only) |
 | Answer / hang up / reject | yes | yes |
 | Redial, volume keys, HSP button | no | yes |
+| Call button outside a call (AVRCP play/pause) | goes to the softphone (`-keep-media-keys`: to the media player) | goes to the softphone |
 | How it works | bt-headset-hid poses as a ModemManager modem; PipeWire forwards `ATA`/`AT+CHUP` to it | bt-headset-hid registers the HFP/HSP Audio Gateway with BlueZ and parses the AT commands itself |
 
 Use `pipewire` if you want to talk through the headset, which is what a dongle does. It needs
@@ -126,6 +127,11 @@ when it sees the hook switch.
   the WirePlumber log, the system sound icon vanishes briefly, or the headset does not ring in
   `-mode pipewire`: check `pipewire --version` (1.2 or later, or the fix script above), then
   restart WirePlumber (`systemctl --user restart wireplumber`).
+- The media player reacts to the call button in `-mode pipewire`: the journal should show
+  `media keys of "<headset> (AVRCP)" now go to the softphone` after the headset connects. In
+  `-mode pipewire` bt-headset-hid takes the headset's AVRCP keys exclusively, so play/pause
+  becomes the call button and next/previous no longer control music from the headset;
+  `-keep-media-keys` turns this off.
 - Buttons do nothing in `-mode pipewire`: check that the WirePlumber configuration is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
 - `create HID device: open /dev/uhid`: the daemon is not running as root, or the `uhid` kernel

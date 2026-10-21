@@ -48,6 +48,8 @@ func main() {
 	name := flag.String("name", "bt-headset-hid", "HID device name")
 	vendor := flag.Uint("vendor", daemon.DefaultVendor, "HID vendor ID")
 	product := flag.Uint("product", daemon.DefaultProduct, "HID product ID")
+	keepMediaKeys := flag.Bool("keep-media-keys", false,
+		`-mode pipewire: leave the headset's play/pause key to the media player instead of using it as the call button`)
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	if *showVersion {
@@ -65,11 +67,12 @@ func main() {
 		}
 	}
 	err := daemon.Run(ctx, daemon.Config{
-		Mode:    daemon.Mode(*mode),
-		Name:    *name,
-		Vendor:  uint32(*vendor),
-		Product: uint32(*product),
-		Logf:    logger.Printf,
+		Mode:          daemon.Mode(*mode),
+		Name:          *name,
+		Vendor:        uint32(*vendor),
+		Product:       uint32(*product),
+		KeepMediaKeys: *keepMediaKeys,
+		Logf:          logger.Printf,
 	})
 	if err != nil {
 		logger.Fatal(err)
