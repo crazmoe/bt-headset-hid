@@ -82,7 +82,13 @@ func TestBridge(t *testing.T) {
 	if want := []hfp.CallState{hfp.Incoming, hfp.Active}; !reflect.DeepEqual(states, want) {
 		t.Errorf("states %v, want %v", states, want)
 	}
-	if len(logged) != 1 {
+	var errs int
+	for _, l := range logged {
+		if !strings.HasPrefix(l, "softphone LEDs:") {
+			errs++
+		}
+	}
+	if errs != 1 || len(logged) != 3 {
 		t.Errorf("logged %q", logged)
 	}
 	if f.errnos[1] != 0 || f.errnos[2] != syscall.EIO || f.errnos[3] != 0 || f.errnos[4] != syscall.EINVAL {
