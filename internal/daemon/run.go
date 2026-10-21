@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/crazmoe/bt-headset-hid/internal/avrcp"
 	"github.com/crazmoe/bt-headset-hid/internal/bluez"
 	"github.com/crazmoe/bt-headset-hid/internal/hfp"
 	"github.com/crazmoe/bt-headset-hid/internal/hiddesc"
@@ -40,8 +42,16 @@ type Config struct {
 	Name    string
 	Vendor  uint32
 	Product uint32
-	Logf    func(format string, args ...any)
+	// GrabMediaKeys takes the headset's AVRCP play/pause key away from the
+	// media player in ModePipeWire and uses it as the call button, for
+	// headsets that send their call button that way outside a call.
+	GrabMediaKeys bool
+	Logf          func(format string, args ...any)
 }
+
+// modemQuiet is how long after an answer or hang-up from PipeWire a media key
+// press is ignored, in case the headset reported the same press both ways.
+const modemQuiet = 1500 * time.Millisecond
 
 // Run creates the HID device, serves the chosen mode on the system bus and
 // returns when ctx ends or something fails.
@@ -80,16 +90,42 @@ func Run(ctx context.Context, cfg Config) error {
 
 	switch cfg.Mode {
 	case ModePipeWire:
-		srv, err := modem.Serve(conn, headsetEvent)
+		var mu sync.Mutex
+		var lastModem time.Time
+		srv, err := modem.Serve(conn, func(e hfp.Event) {
+			mu.Lock()
+			lastModem = time.Now()
+			mu.Unlock()
+			headsetEvent(e)
+		})
 		if err != nil {
 			return err
 		}
 		defer srv.Close()
-		b.OnState(func(s hfp.CallState) {
-			logf("call state: %v", s)
+		if cfg.GrabMediaKeys {
+			w := &avrcp.Watcher{
+				Sysfs: "/sys", Dev: "/dev", Interval: 2 * time.Second, Debounce: 300 * time.Millisecond,
+				Logf: logf,
+				OnEvent: func(e hfp.Event) {
+					mu.Lock()
+					quiet := time.Since(lastModem) < modemQuiet
+					mu.Unlock()
+					if quiet {
+						return
+					}
+					headsetEvent(e)
+				},
+			}
+			go w.Run(ctx)
+		}
+		st := &settler{delay: time.Second, set: func(s hfp.CallState) {
 			if err := srv.SetState(s); err != nil {
 				logf("modem: %v", err)
 			}
+		}}
+		b.OnState(func(s hfp.CallState) {
+			logf("call state: %v", s)
+			st.SetState(s)
 		})
 		logf("serving %s for PipeWire", modem.Service)
 	case ModeHFP:

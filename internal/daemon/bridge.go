@@ -114,6 +114,8 @@ func (b *Bridge) ServeHID(logf func(format string, args ...any)) error {
 			}
 			if err := b.hostOutput(e.Data); err != nil {
 				logf("output report % x: %v", e.Data, err)
+			} else {
+				logLEDs(logf, e.Data)
 			}
 		case uhid.SetReport:
 			errno := syscall.Errno(0)
@@ -122,6 +124,8 @@ func (b *Bridge) ServeHID(logf func(format string, args ...any)) error {
 			} else if err := b.hostOutput(e.Data); err != nil {
 				logf("set report % x: %v", e.Data, err)
 				errno = syscall.EINVAL
+			} else {
+				logLEDs(logf, e.Data)
 			}
 			if err := b.hid.ReplySetReport(e.ID, errno); err != nil {
 				return err
@@ -136,5 +140,12 @@ func (b *Bridge) ServeHID(logf func(format string, args ...any)) error {
 				return err
 			}
 		}
+	}
+}
+
+// logLEDs logs an LED report the host sent, to see what the softphone does.
+func logLEDs(logf func(format string, args ...any), report []byte) {
+	if l, err := hiddesc.UnpackLEDs(report); err == nil {
+		logf("softphone LEDs: off-hook=%v ring=%v mute=%v hold=%v", l.OffHook, l.Ring, l.Mute, l.Hold)
 	}
 }

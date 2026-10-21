@@ -90,17 +90,21 @@ fixed=$(sed -n '/MM_MODEM_VOICE_SIGNAL_CALLADDED)) {/,/MM_MODEM_VOICE_SIGNAL_CAL
 [ "$fixed" -eq 5 ] || die "the fix did not apply cleanly ($fixed of 5 places); nothing was installed"
 
 say "building libspa-bluez5.so (only the Bluetooth plugin)"
-if [ ! -f "$work/build/build.ninja" ]; then
-	meson setup "$work/build" "$src" --buildtype=release \
-		-Dauto_features=disabled -Dsession-managers=[] \
-		-Dspa-plugins=enabled -Ddbus=enabled -Dlibusb=enabled \
-		-Dbluez5=enabled -Dbluez5-backend-hsp-native=enabled -Dbluez5-backend-hfp-native=enabled \
-		-Dbluez5-backend-native-mm=enabled -Dbluez5-backend-ofono=enabled -Dbluez5-backend-hsphfpd=enabled
-fi
+# Same paths as the distribution package: the plugin reads its data files
+# (bluez-hardware.conf with the headset quirks) from <prefix>/share/spa-0.2.
+libdir=${plugin%/spa-0.2/bluez5/libspa-bluez5.so}
+rm -rf "$work/build"
+meson setup "$work/build" "$src" --buildtype=release \
+	--prefix=/usr --libdir="$libdir" --sysconfdir=/etc --localstatedir=/var \
+	-Dauto_features=disabled -Dsession-managers=[] \
+	-Dspa-plugins=enabled -Ddbus=enabled -Dlibusb=enabled \
+	-Dbluez5=enabled -Dbluez5-backend-hsp-native=enabled -Dbluez5-backend-hfp-native=enabled \
+	-Dbluez5-backend-native-mm=enabled -Dbluez5-backend-ofono=enabled -Dbluez5-backend-hsphfpd=enabled
 ninja -C "$work/build" spa/plugins/bluez5/libspa-bluez5.so
 new="$work/libspa-bluez5.so"
 strip --strip-unneeded -o "$new" "$work/build/spa/plugins/bluez5/libspa-bluez5.so"
 grep -q 'org.freedesktop.ModemManager1' "$new" || die "built plugin lacks ModemManager support; nothing was installed"
+grep -q '/usr/share/spa-0.2' "$new" || die "built plugin looks for its data files in the wrong place; nothing was installed"
 
 needed() { readelf -d "$1" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | sort; }
 if ! diff <(needed "$plugin") <(needed "$new") >/dev/null; then

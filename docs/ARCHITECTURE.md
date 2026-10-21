@@ -25,6 +25,16 @@ In mode pipewire, PipeWire's native HFP backend talks to the first ModemManager 
 It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itself as the
 Bluetooth device volume.
 
+Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
+passes an Active that follows Idle on to the modem only after one second, and drops it when
+another state comes first, so the headset does not see a call that ends at once.
+
+Outside a call many headsets send their call button as AVRCP play/pause, which BlueZ turns into
+an input device "<name> (AVRCP)". With `-grab-media-keys` the daemon grabs that device exclusively
+(`EVIOCGRAB`) and feeds play/pause into the mapping as the HSP-style button, so the press reaches
+the softphone instead of the media player. A press within 1.5 s of an answer or hang-up from
+PipeWire is dropped, in case the headset reported it both ways.
+
 ## Packages (under `internal/`)
 
 | Package | Responsibility | I/O |
@@ -33,6 +43,7 @@ Bluetooth device volume.
 | `hfp` | Audio Gateway state machine: SLC handshake (`BRSF`, `CIND`, `CMER`, `CHLD`), call state / `+CIEV`, button events (`ATA`, `CHUP`, `CKPD`, `BLDN`, `BVRA`, `VGS`/`VGM`) | none |
 | `mapping` | Headset event -> HID input reports (hook switch, drop, redial, volume); LED output report -> call state | none |
 | `hiddesc` | Report descriptor + report packing/unpacking | none |
+| `avrcp` | Headset AVRCP input device: matching and play/pause decoding (pure), exclusive grab and read of `/dev/input/eventN` (`Watcher`, mode pipewire) | evdev |
 | `uhid` | `/dev/uhid` create/input/output events | uhid |
 | `modem` | ModemManager modem for PipeWire: call state logic (`Calls`, pure) and its D-Bus export (`Server`) | D-Bus |
 | `bluez` | Register HFP AG / HSP AG profiles via D-Bus, receive RFCOMM fds (mode hfp) | D-Bus |
