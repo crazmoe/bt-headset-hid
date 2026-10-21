@@ -21,7 +21,7 @@ HFP. So you choose:
 | Call audio (headset mic and speaker) | yes | no (A2DP music only) |
 | Answer / hang up / reject | yes | yes |
 | Redial, volume keys, HSP button | no | yes |
-| Call button outside a call (AVRCP play/pause) | goes to the softphone (`-keep-media-keys`: to the media player) | goes to the softphone |
+| Call button outside a call, if the headset sends it as AVRCP play/pause | to the media player (`-grab-media-keys`: to the softphone) | to the softphone |
 | How it works | bt-headset-hid poses as a ModemManager modem; PipeWire forwards `ATA`/`AT+CHUP` to it | bt-headset-hid registers the HFP/HSP Audio Gateway with BlueZ and parses the AT commands itself |
 
 Use `pipewire` if you want to talk through the headset, which is what a dongle does. It needs
@@ -127,11 +127,14 @@ when it sees the hook switch.
   the WirePlumber log, the system sound icon vanishes briefly, or the headset does not ring in
   `-mode pipewire`: check `pipewire --version` (1.2 or later, or the fix script above), then
   restart WirePlumber (`systemctl --user restart wireplumber`).
-- The media player reacts to the call button in `-mode pipewire`: the journal should show
-  `media keys of "<headset> (AVRCP)" now go to the softphone` after the headset connects. In
-  `-mode pipewire` bt-headset-hid takes the headset's AVRCP keys exclusively, so play/pause
-  becomes the call button and next/previous no longer control music from the headset;
-  `-keep-media-keys` turns this off.
+- The media player reacts to the call button in `-mode pipewire`: check with
+  `sudo evtest /dev/input/eventN` (the "<headset> (AVRCP)" device) whether the press arrives
+  there. If it does, `-grab-media-keys` takes that device exclusively, so play/pause becomes the
+  call button (the journal shows `media keys of "<headset> (AVRCP)" now go to the softphone`)
+  and next/previous no longer control music from the headset.
+- No sound during a call in `-mode pipewire`: the softphone must use the headset as speaker and
+  microphone (in its settings, or as the default device), otherwise PipeWire opens no call audio
+  to the headset and it may drop back to music mode.
 - Buttons do nothing in `-mode pipewire`: check that the WirePlumber configuration is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
 - `create HID device: open /dev/uhid`: the daemon is not running as root, or the `uhid` kernel

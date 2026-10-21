@@ -42,9 +42,10 @@ type Config struct {
 	Name    string
 	Vendor  uint32
 	Product uint32
-	// KeepMediaKeys leaves the headset's AVRCP keys to the media player in
-	// ModePipeWire instead of taking them over as the call button.
-	KeepMediaKeys bool
+	// GrabMediaKeys takes the headset's AVRCP play/pause key away from the
+	// media player in ModePipeWire and uses it as the call button, for
+	// headsets that send their call button that way outside a call.
+	GrabMediaKeys bool
 	Logf          func(format string, args ...any)
 }
 
@@ -101,7 +102,7 @@ func Run(ctx context.Context, cfg Config) error {
 			return err
 		}
 		defer srv.Close()
-		if !cfg.KeepMediaKeys {
+		if cfg.GrabMediaKeys {
 			w := &avrcp.Watcher{
 				Sysfs: "/sys", Dev: "/dev", Interval: 2 * time.Second, Debounce: 300 * time.Millisecond,
 				Logf: logf,

@@ -26,7 +26,7 @@ It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itse
 Bluetooth device volume.
 
 Outside a call many headsets send their call button as AVRCP play/pause, which BlueZ turns into
-an input device "<name> (AVRCP)". In mode pipewire the daemon grabs that device exclusively
+an input device "<name> (AVRCP)". With `-grab-media-keys` the daemon grabs that device exclusively
 (`EVIOCGRAB`) and feeds play/pause into the mapping as the HSP-style button, so the press reaches
 the softphone instead of the media player. A press within 1.5 s of an answer or hang-up from
 PipeWire is dropped, in case the headset reported it both ways.
