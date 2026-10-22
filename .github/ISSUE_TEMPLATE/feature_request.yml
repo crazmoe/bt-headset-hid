@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an idea or a headset/softphone that should be supported.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: English or German is fine.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      description: What do you want to do that does not work today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How it could work. Alternatives you considered are welcome too.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      description: Which mode does it concern?
+      options:
+        - pipewire
+        - hfp
+        - both / not sure
+  - type: input
+    id: hardware
+    attributes:
+      label: Headset and softphone
+      description: If the idea concerns a specific headset or softphone.
