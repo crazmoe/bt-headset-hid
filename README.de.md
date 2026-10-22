@@ -165,6 +165,12 @@ go build ./cmd/bt-headset-hid
 
 Tests, die `/dev/uhid` (root) oder `dbus-daemon` brauchen, werden übersprungen, wenn diese fehlen.
 
+## Rückmeldungen
+
+Fehler, Ideen und Testberichte sind als
+[Issues](https://github.com/crazmoe/bt-headset-hid/issues/new/choose) willkommen, auf Deutsch oder Englisch.
+Sicherheitsprobleme bitte vertraulich melden, siehe [SECURITY.md](SECURITY.md).
+
 ## Lizenz
 
 MIT

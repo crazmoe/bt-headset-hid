@@ -1,0 +1,91 @@
+name: Beta test feedback
+description: Tell us how bt-headset-hid works with your headset, also if everything works.
+title: "Beta feedback: <headset> with <softphone>"
+labels: ["beta-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing! Reports that everything works are just as useful as problems,
+        they show which headsets and softphones are known to work. English or German is fine.
+        For a single clear bug a bug report is fine too.
+  - type: input
+    id: version
+    attributes:
+      label: bt-headset-hid version
+      description: Output of `bt-headset-hid -version`.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      multiple: true
+      options:
+        - pipewire
+        - hfp
+    validations:
+      required: true
+  - type: input
+    id: distro
+    attributes:
+      label: Distribution
+      placeholder: Ubuntu 24.04, Fedora 41, Arch, ...
+    validations:
+      required: true
+  - type: input
+    id: pipewire
+    attributes:
+      label: PipeWire and WirePlumber version
+      description: Output of `pipewire --version` and `wireplumber --version`.
+    validations:
+      required: true
+  - type: input
+    id: headset
+    attributes:
+      label: Headset model
+    validations:
+      required: true
+  - type: input
+    id: softphone
+    attributes:
+      label: Softphone
+      description: Name and version, and for browser apps the browser.
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Did `sudo bt-headset-hid install` work?
+      options:
+        - "yes"
+        - "with problems (see below)"
+        - "no, I set it up manually"
+    validations:
+      required: true
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What works?
+      description: Tick what you tested successfully.
+      options:
+        - label: The softphone shows the device `bt-headset-hid`
+        - label: The headset rings on an incoming call
+        - label: Answering with the headset button
+        - label: Hanging up with the headset button
+        - label: Rejecting an incoming call
+        - label: Call audio through the headset (speaker and microphone)
+        - label: "Only `-mode hfp`: redial, volume keys"
+        - label: Music and media keys still behave as expected outside calls
+  - type: textarea
+    id: notes
+    attributes:
+      label: What did not work, or what was odd?
+      description: Also small things, such as delays or steps in the README that were unclear.
+  - type: textarea
+    id: journal
+    attributes:
+      label: Journal output
+      description: If something did not work, `journalctl -u bt-headset-hid -b --no-pager` around the problem.
+      render: text
