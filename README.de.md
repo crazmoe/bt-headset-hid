@@ -24,7 +24,7 @@ belegen. Deshalb wählst du:
 |---|---|---|
 | Wer belegt HFP | PipeWire | bt-headset-hid |
 | Telefon-Audio (Headset-Mikrofon und -Lautsprecher) | ja, als Lautsprecher und Mikrofon „bt-headset-hid“ | nein (nur A2DP-Musik) |
-| Musik über das Headset | Telefonqualität: es bleibt im Telefonprofil und damit anrufbereit; andere Bluetooth-Geräte behalten A2DP | A2DP |
+| Musik über das Headset | A2DP; für ein Gespräch wechselt es ins Telefonprofil und pausiert die Musik (`-profile phone`: immer Telefonqualität) | A2DP |
 | Annehmen / Auflegen / Ablehnen | ja | ja |
 | Wahlwiederholung, Lautstärketasten, HSP-Taste | nein | ja |
 | Anruftaste ausserhalb eines Anrufs, falls das Headset sie als AVRCP Play/Pause schickt | an den Medienplayer (`-grab-media-keys`: ans Softphone) | ans Softphone |
@@ -91,11 +91,13 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
 
 3. **Headset verbinden** wie gewohnt (`bluetoothctl` oder über den Desktop; war es schon
    verbunden, neu verbinden) und in `journalctl -u bt-headset-hid -f` auf „headset … connected“
-   achten. Bei `-mode pipewire` startet das Headset im Telefonprofil (HFP) und ist so immer
-   anrufbereit; andere Bluetooth-Kopfhörer und -Lautsprecher spielen weiter Musik (A2DP). Hast du
-   das Headset erst nach `install` gekoppelt, einmal `bt-headset-hid wireplumber` als normaler
-   Benutzer ausführen, damit Telefonprofil, Lautsprecher und Mikrofon `bt-headset-hid` dafür
-   gelten.
+   achten. Bei `-mode pipewire` spielt das Headset Musik (A2DP). Klingelt es oder rufst du an,
+   pausiert der Benutzerdienst `bt-headset-hid-session` laufende Player, schaltet das Headset ins
+   Telefonprofil (HFP) und nach dem Gespräch zurück und setzt die Player fort
+   (`journalctl --user -u bt-headset-hid-session -f`). Pausiert wird über MPRIS, das die meisten
+   Player und Browser können. Hast du das Headset erst nach `install` gekoppelt, einmal
+   `bt-headset-hid wireplumber` als normaler Benutzer ausführen, damit das und Lautsprecher und
+   Mikrofon `bt-headset-hid` dafür gelten.
 
 4. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Bei `-mode pipewire` auch als
    Lautsprecher und Mikrofon `bt-headset-hid` wählen: Die gibt es immer, sie leiten den Ton zum
@@ -113,12 +115,14 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   entfernt die Datei der jeweils anderen Version und startet PipeWire neu; `-remove` macht es
   rückgängig. Von Hand: die passende Datei aus `contrib/wireplumber/` an den Pfad kopieren, der in
   ihren ersten Zeilen steht. Bei `-mode pipewire` richtet es ausserdem die Headsets ein: Eine
-  WirePlumber-Regel (`52-bt-headset-hid-headset.lua` bzw. `.conf`) startet sie im Telefonprofil,
-  und `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` legt Lautsprecher und Mikrofon
+  WirePlumber-Regel (`52-bt-headset-hid-headset.lua` bzw. `.conf`) gibt ihrem Telefon-Audio einen
+  gemeinsamen Namen, `~/.config/systemd/user/bt-headset-hid-session.service` schaltet sie für
+  Gespräche ins Telefonprofil, und `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` legt Lautsprecher und Mikrofon
   `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, das erste, das
   PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
   einzurichten, etwa eines fürs Büro und eines für zu Hause, oder zum Wechseln:
-  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`.
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Mit `-profile phone` bleiben die Headsets
+  stattdessen immer im Telefonprofil, ohne den Benutzerdienst (`-profile switch` schaltet zurück).
 - Nur für `-mode pipewire`: `sudo systemctl disable --now ModemManager` (Mobilfunkmodems gehen
   nicht, solange bt-headset-hid läuft) und
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire muss mit
@@ -161,6 +165,9 @@ sobald es den Hook Switch sieht.
   ankommt. Wenn ja, übernimmt `-grab-media-keys` dieses Gerät exklusiv, Play/Pause wird so zur
   Anruftaste (im Journal steht `media keys of "<Headset> (AVRCP)" now go to the softphone`), und
   Vor/Zurück steuern vom Headset aus keine Musik mehr.
+- Das Headset bleibt bei `-mode pipewire` im Gespräch im Musikprofil: `systemctl --user status
+  bt-headset-hid-session` und dessen Journal prüfen. Als Ausweg hält
+  `bt-headset-hid wireplumber -profile phone` es im Telefonprofil.
 - Kein Ton im Gespräch bei `-mode pipewire`: Das Softphone muss `bt-headset-hid` (oder das
   Headset) als Lautsprecher und Mikrofon verwenden, sonst öffnet PipeWire keinen Gesprächston zum
   Headset. Nach einem Neustart von PipeWire auch das Softphone neu starten. `wpctl status` zeigt

@@ -16,6 +16,10 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 - pipewire mode: several headsets, e.g. one for the office and one for home:
   `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. The `bt-headset-hid` speaker and microphone
   use whichever of them is connected.
+- pipewire mode: the headsets play music (A2DP) between calls. For a call the new user service
+  `bt-headset-hid-session` pauses media players (MPRIS), switches the headsets to the phone
+  profile, and afterwards switches back and resumes them. `-profile phone` keeps them in the
+  phone profile all the time instead.
 
 ## 0.2.0
 
