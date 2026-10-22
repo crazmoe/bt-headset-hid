@@ -124,3 +124,39 @@ func sinkName(raw json.RawMessage) string {
 	}
 	return v.Name
 }
+
+// ParseOutput returns the default output the user chose
+// (default.configured.audio.sink) from the output of pw-dump, or "".
+func ParseOutput(dump []byte) (string, error) {
+	type object struct {
+		Type     string         `json:"type"`
+		Props    map[string]any `json:"props"`
+		Metadata []struct {
+			Subject uint32          `json:"subject"`
+			Key     string          `json:"key"`
+			Value   json.RawMessage `json:"value"`
+		} `json:"metadata"`
+	}
+	out := ""
+	dec := json.NewDecoder(bytes.NewReader(dump))
+	for n := 0; ; n++ {
+		var objs []object
+		err := dec.Decode(&objs)
+		if errors.Is(err, io.EOF) && n > 0 {
+			return out, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("pw-dump: %w", err)
+		}
+		for _, o := range objs {
+			if o.Type != "PipeWire:Interface:Metadata" || o.Props["metadata.name"] != "default" {
+				continue
+			}
+			for _, m := range o.Metadata {
+				if m.Subject == 0 && m.Key == "default.configured.audio.sink" {
+					out = sinkName(m.Value)
+				}
+			}
+		}
+	}
+}

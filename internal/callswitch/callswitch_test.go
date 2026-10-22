@@ -13,6 +13,18 @@ type fakeEnv struct {
 	playing []string
 	log     []string
 	failSet bool
+	output  string
+	// moveOutput is the default output the desktop picks when a headset
+	// leaves the music profile.
+	moveOutput string
+}
+
+func (f *fakeEnv) Output() (string, error) { return f.output, nil }
+
+func (f *fakeEnv) SetOutput(name string) error {
+	f.log = append(f.log, "output "+name)
+	f.output = name
+	return nil
 }
 
 func (f *fakeEnv) Cards() ([]Card, error) { return f.cards, nil }
@@ -22,6 +34,9 @@ func (f *fakeEnv) SetProfile(c Card, profile string) error {
 		return fmt.Errorf("busy")
 	}
 	f.log = append(f.log, "profile "+c.Name+" "+profile)
+	if IsPhone(profile) && f.moveOutput != "" {
+		f.output = f.moveOutput
+	}
 	for i := range f.cards {
 		if f.cards[i].Name == c.Name {
 			f.cards[i].Profile = profile
@@ -85,6 +100,19 @@ func TestSwitcherDefaultOutput(t *testing.T) {
 	s.Call(true)
 	s.Call(false)
 	want := []string{"profile bluez_card.JABRA headset-head-unit", "profile bluez_card.JABRA a2dp-sink"}
+	if !reflect.DeepEqual(env.log, want) {
+		t.Errorf("log %q, want %q", env.log, want)
+	}
+}
+
+func TestSwitcherRestoresOutput(t *testing.T) {
+	jbl, jabra := card("bluez_card.JBL", "a2dp-sink"), card("bluez_card.JABRA", "a2dp-sink")
+	jabra.Default = true
+	env := &fakeEnv{cards: []Card{jbl, jabra}, output: "bluez_output.JABRA.1", moveOutput: "bluez_output.JBL.1"}
+	s := &Switcher{Env: env, Settle: func() { env.log = append(env.log, "settle") }}
+	s.Call(true)
+	s.Call(false)
+	want := []string{"profile bluez_card.JABRA headset-head-unit", "profile bluez_card.JABRA a2dp-sink", "settle", "output bluez_output.JABRA.1"}
 	if !reflect.DeepEqual(env.log, want) {
 		t.Errorf("log %q, want %q", env.log, want)
 	}
@@ -168,6 +196,19 @@ const dump = `[
   ] },
   { "id": 43, "type": "PipeWire:Interface:Device", "info": null }
 ]`
+
+func TestParseOutput(t *testing.T) {
+	out, err := ParseOutput([]byte(dump))
+	if err != nil || out != "alsa_output.pci-0000_00_1f.3.analog-stereo" {
+		t.Errorf("ParseOutput = %q, %v", out, err)
+	}
+	if out, err := ParseOutput([]byte("[]")); out != "" || err != nil {
+		t.Errorf("ParseOutput without metadata = %q, %v", out, err)
+	}
+	if _, err := ParseOutput([]byte("x")); err == nil {
+		t.Error("bad dump accepted")
+	}
+}
 
 func TestParseCards(t *testing.T) {
 	cards, err := ParseCards([]byte(dump), map[string]bool{"bluez_card.AC_BF_71_12_34_56": true, "bluez_card.50_C2_75_0D_4E_03": true})

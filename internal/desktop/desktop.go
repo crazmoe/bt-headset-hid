@@ -5,6 +5,7 @@
 package desktop
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -50,6 +51,28 @@ func (s System) Cards() ([]callswitch.Card, error) {
 		return nil, fmt.Errorf("pw-dump: %w", err)
 	}
 	return callswitch.ParseCards(out, s.Names)
+}
+
+func (s System) Output() (string, error) {
+	out, err := exec.Command("pw-dump").Output()
+	if err != nil {
+		return "", fmt.Errorf("pw-dump: %w", err)
+	}
+	return callswitch.ParseOutput(out)
+}
+
+func (s System) SetOutput(name string) error {
+	v, err := json.Marshal(struct {
+		Name string `json:"name"`
+	}{name})
+	if err != nil {
+		return err
+	}
+	out, err := exec.Command("pw-metadata", "-n", "default", "0", "default.configured.audio.sink", string(v), "Spa:String:JSON").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("pw-metadata: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func (s System) SetProfile(c callswitch.Card, profile string) error {
