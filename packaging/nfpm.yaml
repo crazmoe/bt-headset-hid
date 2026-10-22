@@ -1,0 +1,40 @@
+# deb and rpm packages, built by .github/workflows/release.yml with
+# VERSION and ARCH (amd64, arm64) set. The package only ships the program
+# and docs; "sudo bt-headset-hid install" writes the mode-dependent files.
+name: bt-headset-hid
+version: ${VERSION}
+arch: ${ARCH}
+platform: linux
+section: utils
+priority: optional
+maintainer: crazmoe <225934907+crazmoe@users.noreply.github.com>
+homepage: https://github.com/crazmoe/bt-headset-hid
+license: MIT
+description: |
+  Bluetooth headset buttons as HID telephony device.
+  Softphones see a USB-dongle-like HID telephony device that reports
+  answer and hang-up from a Bluetooth headset.
+recommends:
+  - bluez
+  - wireplumber
+
+contents:
+  - src: build/bt-headset-hid
+    dst: /usr/bin/bt-headset-hid
+    file_info:
+      mode: 0755
+  - src: README.md
+    dst: /usr/share/doc/bt-headset-hid/README.md
+  - src: README.de.md
+    dst: /usr/share/doc/bt-headset-hid/README.de.md
+  - src: CHANGELOG.md
+    dst: /usr/share/doc/bt-headset-hid/CHANGELOG.md
+  - src: LICENSE
+    dst: /usr/share/doc/bt-headset-hid/LICENSE
+  - src: contrib/
+    dst: /usr/share/doc/bt-headset-hid/contrib/
+    type: tree
+
+scripts:
+  postinstall: packaging/postinstall.sh
+  preremove: packaging/preremove.sh
