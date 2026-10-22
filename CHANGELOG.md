@@ -20,7 +20,8 @@ version and the output of `journalctl -u bt-headset-hid`, as a
   `bt-headset-hid-session` pauses media players (MPRIS), switches the headsets to the phone
   profile, and afterwards switches back and resumes them. `-profile phone` keeps them in the
   phone profile all the time instead. With two headsets connected, only the one chosen as
-  output in the sound settings switches, so the call goes where the music plays.
+  output in the sound settings switches, so the call goes where the music plays. WirePlumber's
+  own switch to the phone profile, which switched every Bluetooth headset, is turned off then.
 
 ## 0.2.0
 

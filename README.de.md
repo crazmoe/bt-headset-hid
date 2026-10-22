@@ -122,7 +122,9 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   an das, das in den Toneinstellungen als Ausgabe gewählt ist; mit `-profile phone` an das erste,
   das PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
   einzurichten, etwa eines fürs Büro und eines für zu Hause, oder zum Wechseln:
-  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Mit `-profile phone` bleiben die Headsets
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Ausserdem schaltet es WirePlumbers eigenen
+  Wechsel ins Telefonprofil ab (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), der bei einem
+  Gespräch jedes Bluetooth-Headset umschalten würde. Mit `-profile phone` bleiben die Headsets
   stattdessen immer im Telefonprofil, ohne den Benutzerdienst (`-profile switch` schaltet zurück).
 - Nur für `-mode pipewire`: `sudo systemctl disable --now ModemManager` (Mobilfunkmodems gehen
   nicht, solange bt-headset-hid läuft) und

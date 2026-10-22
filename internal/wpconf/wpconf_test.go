@@ -201,12 +201,28 @@ func TestHeadset(t *testing.T) {
 	if !ConfiguredPhone(dir) {
 		t.Error("ConfiguredPhone = false after phone rules")
 	}
+	noAuto := filepath.Join(dir, "wireplumber", "policy.lua.d", "52-bt-headset-hid-session.lua")
+	if _, err := os.Stat(noAuto); !os.IsNotExist(err) {
+		t.Errorf("autoswitch policy with phone rules: %v", err)
+	}
+	if _, err := InstallHeadset(dir, []string{jabra, jbl}, Version{0, 4}, false); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(noAuto); err != nil || !strings.Contains(string(data), `bluetooth_policy.policy["media-role.use-headset-profile"] = false`) {
+		t.Errorf("autoswitch policy for 0.4 switching: %q, %v", data, err)
+	}
 	p5, err := InstallHeadset(dir, []string{jbl}, Version{0, 5}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if ConfiguredPhone(dir) {
 		t.Error("ConfiguredPhone = true after switching rules")
+	}
+	if _, err := os.Stat(noAuto); !os.IsNotExist(err) {
+		t.Errorf("0.4 autoswitch policy left with 0.5: %v", err)
+	}
+	if data, _ := os.ReadFile(p5); !strings.Contains(string(data), "bluetooth.autoswitch-to-headset-profile = false") {
+		t.Errorf("0.5 switching rules without autoswitch setting:\n%s", data)
 	}
 	if _, err := os.Stat(p4); !os.IsNotExist(err) {
 		t.Errorf("Lua rule still there after the switch to 0.5: %v", err)

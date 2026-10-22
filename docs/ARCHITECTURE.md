@@ -42,7 +42,10 @@ adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting 
 they follow whichever headset is in the phone profile. With two connected, `bt-headset-hid session`
 switches only the one whose node is the default output (`default.audio.sink`), so the call goes
 where the music plays; if neither is, it switches both and WirePlumber takes the first it finds,
-as it does with `-profile phone`. Their side towards the headset is passive, so the call audio only runs while a program
+as it does with `-profile phone`. Without `-profile phone` WirePlumber's own switch
+(`media-role.use-headset-profile` in 0.4, `bluetooth.autoswitch-to-headset-profile` in 0.5) is
+turned off: when a call stream starts it would switch every Bluetooth headset, including ones
+bt-headset-hid does not serve. Their side towards the headset is passive, so the call audio only runs while a program
 uses them; without a headset WirePlumber connects them to the default devices.
 
 Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon

@@ -103,7 +103,15 @@ func (s System) Play(player string) error {
 // is the bt-headset-hid daemon in mode pipewire, has a call that rings, is
 // being dialled or is going on. Without the modem there is no call.
 func InCall(conn *dbus.Conn) (bool, error) {
-	v, err := conn.Object(modem.Service, modem.ModemPath).GetProperty(modem.Service + ".Modem.Voice.Calls")
+	// Without NoAutoStart the bus would try to start ModemManager, and
+	// systemd answers that it has no such unit.
+	get := func(path dbus.ObjectPath, iface, prop string) (dbus.Variant, error) {
+		var v dbus.Variant
+		err := conn.Object(modem.Service, path).
+			Call("org.freedesktop.DBus.Properties.Get", dbus.FlagNoAutoStart, iface, prop).Store(&v)
+		return v, err
+	}
+	v, err := get(modem.ModemPath, modem.Service+".Modem.Voice", "Calls")
 	if err != nil {
 		if e, ok := err.(dbus.Error); ok && (e.Name == "org.freedesktop.DBus.Error.ServiceUnknown" || e.Name == "org.freedesktop.DBus.Error.NameHasNoOwner") {
 			return false, nil
@@ -112,7 +120,7 @@ func InCall(conn *dbus.Conn) (bool, error) {
 	}
 	paths, _ := v.Value().([]dbus.ObjectPath)
 	for _, p := range paths {
-		st, err := conn.Object(modem.Service, p).GetProperty(modem.Service + ".Call.State")
+		st, err := get(p, modem.Service+".Call", "State")
 		if err != nil {
 			continue // the call ended meanwhile
 		}
