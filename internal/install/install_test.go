@@ -31,7 +31,7 @@ func TestFilesMatchContrib(t *testing.T) {
 		}
 	}
 	b, err := os.ReadFile("../../contrib/systemd/bt-headset-hid.service")
-	if err != nil || !bytes.Equal(b, UnitFile("pipewire")) {
+	if err != nil || !bytes.Equal(b, UnitFile(Binary, "pipewire")) {
 		t.Errorf("contrib unit differs from UnitFile(pipewire) (%v)", err)
 	}
 }
@@ -126,6 +126,30 @@ func TestInstallFromBinaryPath(t *testing.T) {
 	for _, s := range steps {
 		if s.AsUser != nil {
 			t.Fatal("AsUser step without user")
+		}
+	}
+}
+
+func TestInstallFromPackage(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, filepath.Dir(Binary)), 0o755)
+	os.WriteFile(filepath.Join(root, Binary), []byte("old copy"), 0o755)
+	o := Options{Mode: "pipewire", Self: PackagedBinary, User: "moe", UID: 5}
+	steps, _ := Plan(o)
+	r := apply(t, steps, o, root)
+	if exists(root, Binary) {
+		t.Error("old copy in /usr/local/bin left")
+	}
+	unit, _ := os.ReadFile(filepath.Join(root, Unit))
+	if !strings.Contains(string(unit), "ExecStart="+PackagedBinary+" -mode pipewire\n") {
+		t.Errorf("unit:\n%s", unit)
+	}
+	if r.asUser[0][2] != PackagedBinary {
+		t.Errorf("as user %v", r.asUser)
+	}
+	for _, s := range PlanUninstall(o) {
+		if s.Remove == PackagedBinary {
+			t.Error("uninstall removes the packaged binary")
 		}
 	}
 }

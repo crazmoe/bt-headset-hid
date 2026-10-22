@@ -27,12 +27,17 @@ const (
 	DBusPolicy = "/etc/dbus-1/system.d/bt-headset-hid.conf"
 	ModulesCfg = "/etc/modules-load.d/bt-headset-hid.conf"
 	Service    = "bt-headset-hid.service"
+	// PackagedBinary is where the deb and rpm packages put the program. The
+	// package manager owns it, so install uses it in place and uninstall
+	// leaves it alone.
+	PackagedBinary = "/usr/bin/bt-headset-hid"
 )
 
 // Options describe an installation.
 type Options struct {
 	Mode string // "pipewire" or "hfp"
-	// Self is the running executable, copied to Binary.
+	// Self is the running executable, copied to Binary unless it is
+	// PackagedBinary.
 	Self string
 	// User is the desktop user whose WirePlumber configuration is set up
 	// (from SUDO_USER); empty skips that step.
@@ -59,8 +64,16 @@ type File struct {
 	Perm fs.FileMode
 }
 
-// UnitFile returns the systemd unit for mode.
-func UnitFile(mode string) []byte {
+// binary is the program the service and the WirePlumber step run.
+func (o Options) binary() string {
+	if o.Self == PackagedBinary {
+		return PackagedBinary
+	}
+	return Binary
+}
+
+// UnitFile returns the systemd unit that runs bin in mode.
+func UnitFile(bin, mode string) []byte {
 	return []byte(`[Unit]
 Description=Bluetooth headset buttons as HID telephony device
 After=bluetooth.service dbus.service
@@ -68,7 +81,7 @@ Wants=bluetooth.service
 
 [Service]
 # Switch modes with "sudo bt-headset-hid install -mode hfp" (or pipewire).
-ExecStart=` + Binary + ` -mode ` + mode + `
+ExecStart=` + bin + ` -mode ` + mode + `
 Restart=on-failure
 RestartSec=5
 
@@ -91,7 +104,12 @@ func Plan(o Options) ([]Step, error) {
 		return nil, fmt.Errorf("install: unknown mode %q", o.Mode)
 	}
 	var s []Step
-	if o.Self != Binary {
+	switch o.Self {
+	case PackagedBinary:
+		// Drop a copy left from an installation without the package.
+		s = append(s, Step{Remove: Binary})
+	case Binary:
+	default:
 		s = append(s, Step{Comment: "install " + Binary, Copy: &File{Path: Binary, From: o.Self, Perm: 0o755}})
 	}
 	s = append(s,
@@ -109,14 +127,14 @@ func Plan(o Options) ([]Step, error) {
 		s = append(s, Step{Remove: DBusPolicy})
 	}
 	s = append(s,
-		Step{Comment: "systemd service with -mode " + o.Mode, Write: &File{Path: Unit, Data: UnitFile(o.Mode), Perm: 0o644}},
+		Step{Comment: "systemd service with -mode " + o.Mode, Write: &File{Path: Unit, Data: UnitFile(o.binary(), o.Mode), Perm: 0o644}},
 		Step{Run: []string{"systemctl", "daemon-reload"}},
 		Step{Run: []string{"systemctl", "enable", Service}},
 	)
 	// WirePlumber first, so PipeWire has released (or taken) HFP before the
 	// daemon starts.
 	if o.User != "" {
-		s = append(s, Step{Comment: "WirePlumber configuration for " + o.User, AsUser: []string{Binary, "wireplumber", "-mode", o.Mode}})
+		s = append(s, Step{Comment: "WirePlumber configuration for " + o.User, AsUser: []string{o.binary(), "wireplumber", "-mode", o.Mode}})
 	}
 	s = append(s, Step{Comment: "start the service", Run: []string{"systemctl", "restart", Service}})
 	return s, nil
@@ -127,7 +145,7 @@ func Plan(o Options) ([]Step, error) {
 func PlanUninstall(o Options) []Step {
 	var s []Step
 	if o.User != "" {
-		s = append(s, Step{Comment: "remove WirePlumber configuration of " + o.User, AsUser: []string{Binary, "wireplumber", "-remove"}})
+		s = append(s, Step{Comment: "remove WirePlumber configuration of " + o.User, AsUser: []string{o.binary(), "wireplumber", "-remove"}})
 	}
 	s = append(s,
 		Step{Comment: "stop and disable the service", Try: []string{"systemctl", "disable", "--now", Service}},

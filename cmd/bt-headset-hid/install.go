@@ -65,8 +65,12 @@ func runInstall(args []string, uninstall bool) error {
 	if user, uid, ok := install.SudoUser(os.Getenv); ok {
 		o.User, o.UID = user, uid
 	} else {
+		step := "wireplumber -mode " + mode
+		if uninstall {
+			step = "wireplumber -remove"
+		}
 		fmt.Println("note: not started via sudo from a desktop user; skipping the WirePlumber step,")
-		fmt.Println("      run \"bt-headset-hid wireplumber -mode " + mode + "\" as that user yourself")
+		fmt.Println("      run \"bt-headset-hid " + step + "\" as that user yourself")
 	}
 
 	var steps []install.Step

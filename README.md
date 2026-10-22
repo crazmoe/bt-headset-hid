@@ -7,8 +7,13 @@ softphones (Teams, Zoom, browser apps via WebHID, ...) see a HID telephony devic
 (`/dev/hidrawN`, created via `/dev/uhid`) that reports answer and hang-up from the
 headset and receives the ring and off-hook state from the softphone.
 
-**Status:** feature complete, not yet tested with real hardware.
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
+**Status:** beta.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and
+[CHANGELOG.md](CHANGELOG.md) for the changes.
+
+> **Beta testers wanted:** please try bt-headset-hid with your headset and softphone in daily use
+> and report what works and what does not in a [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues)
+> (headset model, distribution, PipeWire version, `journalctl -u bt-headset-hid`).
 
 ## Two modes
 
@@ -46,8 +51,16 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
 
 1. **Download or build**
 
-   Ready-made binaries for `amd64` and `arm64` are on the
-   [releases page](https://github.com/crazmoe/bt-headset-hid/releases). Unpack and change into the folder:
+   The [releases page](https://github.com/crazmoe/bt-headset-hid/releases) has packages for
+   `amd64` and `arm64`. On Debian/Ubuntu or Fedora/openSUSE install the package, which puts the
+   program in `/usr/bin` (removing the package later also undoes step 2):
+
+   ```
+   sudo apt install ./bt-headset-hid_*_amd64.deb      # Debian, Ubuntu
+   sudo dnf install ./bt-headset-hid-*.x86_64.rpm     # Fedora (openSUSE: zypper install)
+   ```
+
+   On other distributions take the tarball, unpack it and change into the folder:
 
    ```
    tar xzf bt-headset-hid_*_linux_amd64.tar.gz
@@ -63,7 +76,8 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
 2. **Install**, from your normal desktop user with `sudo`:
 
    ```
-   sudo ./bt-headset-hid install
+   sudo bt-headset-hid install      # from the package
+   sudo ./bt-headset-hid install    # from the tarball or your own build
    ```
 
    It asks for the mode (or pass `-mode pipewire` / `-mode hfp`) and then sets up everything:

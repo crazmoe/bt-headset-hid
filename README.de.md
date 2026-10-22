@@ -7,8 +7,13 @@ Softphones (Teams, Zoom, Browser-Apps über WebHID, ...) sehen ein HID-Telefonie
 (`/dev/hidrawN`, angelegt über `/dev/uhid`), das Annehmen und Auflegen vom Headset meldet und
 vom Softphone den Klingel- und Off-Hook-Zustand bekommt.
 
-**Status:** Funktionen vollständig, noch nicht mit echter Hardware getestet.
-Siehe [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) für den Aufbau.
+**Status:** Beta.
+Siehe [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) für den Aufbau und
+[CHANGELOG.md](CHANGELOG.md) für die Änderungen (auf Englisch).
+
+> **Betatester gesucht:** Bitte probiere bt-headset-hid mit deinem Headset und Softphone im Alltag aus
+> und melde, was geht und was nicht, in einem [GitHub-Issue](https://github.com/crazmoe/bt-headset-hid/issues)
+> (Headset-Modell, Distribution, PipeWire-Version, `journalctl -u bt-headset-hid`).
 
 ## Zwei Modi
 
@@ -47,8 +52,16 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
 
 1. **Herunterladen oder bauen**
 
-   Fertige Programme für `amd64` und `arm64` gibt es auf der
-   [Release-Seite](https://github.com/crazmoe/bt-headset-hid/releases). Entpacken und in den Ordner wechseln:
+   Auf der [Release-Seite](https://github.com/crazmoe/bt-headset-hid/releases) gibt es Pakete für
+   `amd64` und `arm64`. Unter Debian/Ubuntu oder Fedora/openSUSE das Paket installieren; es legt
+   das Programm nach `/usr/bin` (wer das Paket später entfernt, macht damit auch Schritt 2 rückgängig):
+
+   ```
+   sudo apt install ./bt-headset-hid_*_amd64.deb      # Debian, Ubuntu
+   sudo dnf install ./bt-headset-hid-*.x86_64.rpm     # Fedora (openSUSE: zypper install)
+   ```
+
+   Auf anderen Distributionen das Tarball nehmen, entpacken und in den Ordner wechseln:
 
    ```
    tar xzf bt-headset-hid_*_linux_amd64.tar.gz
@@ -64,7 +77,8 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
 2. **Installieren**, als dein normaler Desktop-Benutzer mit `sudo`:
 
    ```
-   sudo ./bt-headset-hid install
+   sudo bt-headset-hid install      # aus dem Paket
+   sudo ./bt-headset-hid install    # aus dem Tarball oder dem eigenen Build
    ```
 
    Der Befehl fragt nach dem Modus (oder `-mode pipewire` / `-mode hfp` angeben) und richtet dann
