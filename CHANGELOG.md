@@ -8,7 +8,7 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
-## Unreleased
+## 0.3.0
 
 - pipewire mode: only the headset bt-headset-hid serves starts in the phone profile; other
   Bluetooth headphones and speakers keep music (A2DP) again. `bt-headset-hid wireplumber`
