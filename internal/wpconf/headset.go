@@ -60,11 +60,15 @@ const PhoneMarker = "bt-headset-hid-profile: phone"
 //
 // The rules rename the call audio nodes of all these headsets to
 // HeadsetOutput and HeadsetInput, the targets of the fixed devices. If more
-// than one headset is connected, WirePlumber uses the first it finds.
+// than one of them is in the phone profile, WirePlumber uses the first it
+// finds.
 //
 // With phone, the headsets also start in the phone profile (HFP) instead of
-// A2DP and stay there, which needs no "bt-headset-hid session". Other
-// Bluetooth devices keep A2DP either way.
+// A2DP and stay there, which needs no "bt-headset-hid session". Without,
+// WirePlumber's own switch to the phone profile, which would switch every
+// Bluetooth headset when a call starts, is turned off (for 0.4 by a separate
+// policy file that InstallHeadset writes). Other Bluetooth devices keep A2DP
+// either way.
 func HeadsetContent(addrs []string, v Version, phone bool) ([]byte, error) {
 	upper, ids, err := headsetIDs(addrs)
 	if err != nil {
@@ -123,8 +127,28 @@ table.insert(bluez_monitor.rules, {
 `, id, HeadsetOutput, HeadsetInput)
 	}
 	b.WriteString("]\n")
+	if !phone {
+		b.WriteString(`# "bt-headset-hid session" switches the profile for calls; WirePlumber's own switch
+# would put every Bluetooth headset into the phone profile when a call starts.
+wireplumber.settings = {
+  bluetooth.autoswitch-to-headset-profile = false
+}
+`)
+	}
 	return []byte(b.String()), nil
 }
+
+// noAutoswitchPath is the WirePlumber 0.4 policy file that turns off
+// WirePlumber's own switch to the phone profile, see HeadsetContent.
+func noAutoswitchPath(dir string) string {
+	return filepath.Join(dir, "wireplumber", "policy.lua.d", "52-bt-headset-hid-session.lua")
+}
+
+const noAutoswitchLua = `-- bt-headset-hid: "bt-headset-hid session" switches the profile for calls; WirePlumber's own
+-- switch would put every Bluetooth headset into the phone profile when a call starts.
+-- ~/.config/wireplumber/policy.lua.d/52-bt-headset-hid-session.lua, written by "bt-headset-hid wireplumber".
+bluetooth_policy.policy["media-role.use-headset-profile"] = false
+`
 
 // InstallHeadset writes the rules for the headsets addrs (see HeadsetContent), removes the file of
 // the other format and returns the path written.
@@ -143,15 +167,25 @@ func InstallHeadset(dir string, addrs []string, v Version, phone bool) (string, 
 	if err := os.Remove(other); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
-	return target, nil
+	na := noAutoswitchPath(dir)
+	if phone || !v.Lua() {
+		if err := os.Remove(na); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return "", err
+		}
+		return target, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(na), 0o755); err != nil {
+		return "", err
+	}
+	return target, os.WriteFile(na, []byte(noAutoswitchLua), 0o644)
 }
 
-// RemoveHeadset deletes the headset rules in both formats and returns the
-// paths that existed.
+// RemoveHeadset deletes the headset rules in both formats, and the policy
+// file of InstallHeadset, and returns the paths that existed.
 func RemoveHeadset(dir string) ([]string, error) {
 	a, b := HeadsetPaths(dir, Version{0, 5})
 	var removed []string
-	for _, p := range []string{a, b} {
+	for _, p := range []string{a, b, noAutoswitchPath(dir)} {
 		err := os.Remove(p)
 		switch {
 		case err == nil:

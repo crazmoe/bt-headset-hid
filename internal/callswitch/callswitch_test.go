@@ -13,6 +13,18 @@ type fakeEnv struct {
 	playing []string
 	log     []string
 	failSet bool
+	output  string
+	// moveOutput is the default output the desktop picks when a headset
+	// leaves the music profile.
+	moveOutput string
+}
+
+func (f *fakeEnv) Output() (string, error) { return f.output, nil }
+
+func (f *fakeEnv) SetOutput(name string) error {
+	f.log = append(f.log, "output "+name)
+	f.output = name
+	return nil
 }
 
 func (f *fakeEnv) Cards() ([]Card, error) { return f.cards, nil }
@@ -22,6 +34,9 @@ func (f *fakeEnv) SetProfile(c Card, profile string) error {
 		return fmt.Errorf("busy")
 	}
 	f.log = append(f.log, "profile "+c.Name+" "+profile)
+	if IsPhone(profile) && f.moveOutput != "" {
+		f.output = f.moveOutput
+	}
 	for i := range f.cards {
 		if f.cards[i].Name == c.Name {
 			f.cards[i].Profile = profile
@@ -73,6 +88,33 @@ func TestSwitcher(t *testing.T) {
 	}
 	if env.cards[1].Profile != "headset-head-unit" {
 		t.Errorf("headset already in the phone profile changed to %s", env.cards[1].Profile)
+	}
+}
+
+func TestSwitcherDefaultOutput(t *testing.T) {
+	// With two connected, only the one with the default output switches.
+	jbl, jabra := card("bluez_card.JBL", "a2dp-sink"), card("bluez_card.JABRA", "a2dp-sink")
+	jabra.Default = true
+	env := &fakeEnv{cards: []Card{jbl, jabra}}
+	s := &Switcher{Env: env}
+	s.Call(true)
+	s.Call(false)
+	want := []string{"profile bluez_card.JABRA headset-head-unit", "profile bluez_card.JABRA a2dp-sink"}
+	if !reflect.DeepEqual(env.log, want) {
+		t.Errorf("log %q, want %q", env.log, want)
+	}
+}
+
+func TestSwitcherRestoresOutput(t *testing.T) {
+	jbl, jabra := card("bluez_card.JBL", "a2dp-sink"), card("bluez_card.JABRA", "a2dp-sink")
+	jabra.Default = true
+	env := &fakeEnv{cards: []Card{jbl, jabra}, output: "bluez_output.JABRA.1", moveOutput: "bluez_output.JBL.1"}
+	s := &Switcher{Env: env, Settle: func() { env.log = append(env.log, "settle") }}
+	s.Call(true)
+	s.Call(false)
+	want := []string{"profile bluez_card.JABRA headset-head-unit", "profile bluez_card.JABRA a2dp-sink", "settle", "output bluez_output.JABRA.1"}
+	if !reflect.DeepEqual(env.log, want) {
+		t.Errorf("log %q, want %q", env.log, want)
 	}
 }
 
@@ -146,8 +188,27 @@ const dump = `[
         "Profile": [ { "index": 1, "name": "a2dp-sink", "save": false } ]
       } } },
   { "id": 42, "type": "PipeWire:Interface:Device", "info": { "props": { "device.name": "alsa_card.pci-0000_00_1f.3" }, "params": {} } },
+  { "id": 50, "type": "PipeWire:Interface:Node", "info": { "props": { "node.name": "bluez_output.AC_BF_71_12_34_56.1", "device.id": 41 } } },
+  { "id": 51, "type": "PipeWire:Interface:Node", "info": { "props": { "node.name": "alsa_output.pci-0000_00_1f.3.analog-stereo", "device.id": 42 } } },
+  { "id": 60, "type": "PipeWire:Interface:Metadata", "props": { "metadata.name": "default" }, "metadata": [
+      { "subject": 0, "key": "default.configured.audio.sink", "type": "Spa:String:JSON", "value": { "name": "alsa_output.pci-0000_00_1f.3.analog-stereo" } },
+      { "subject": 0, "key": "default.audio.sink", "type": "Spa:String:JSON", "value": { "name": "bluez_output.AC_BF_71_12_34_56.1" } }
+  ] },
   { "id": 43, "type": "PipeWire:Interface:Device", "info": null }
 ]`
+
+func TestParseOutput(t *testing.T) {
+	out, err := ParseOutput([]byte(dump))
+	if err != nil || out != "alsa_output.pci-0000_00_1f.3.analog-stereo" {
+		t.Errorf("ParseOutput = %q, %v", out, err)
+	}
+	if out, err := ParseOutput([]byte("[]")); out != "" || err != nil {
+		t.Errorf("ParseOutput without metadata = %q, %v", out, err)
+	}
+	if _, err := ParseOutput([]byte("x")); err == nil {
+		t.Error("bad dump accepted")
+	}
+}
 
 func TestParseCards(t *testing.T) {
 	cards, err := ParseCards([]byte(dump), map[string]bool{"bluez_card.AC_BF_71_12_34_56": true, "bluez_card.50_C2_75_0D_4E_03": true})
@@ -155,16 +216,18 @@ func TestParseCards(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Card{{ID: 41, Name: "bluez_card.AC_BF_71_12_34_56", Profile: "a2dp-sink",
-		Profiles: map[string]int{"off": 0, "a2dp-sink": 1, "headset-head-unit": 4}}}
+		Profiles: map[string]int{"off": 0, "a2dp-sink": 1, "headset-head-unit": 4}, Default: true}}
 	if !reflect.DeepEqual(cards, want) {
 		t.Errorf("ParseCards = %+v", cards)
 	}
 	// pw-dump 1.0 may follow up with more arrays: an update and a removal.
 	more := dump + `
 [ { "id": 41, "type": "PipeWire:Interface:Device", "info": { "props": {}, "params": { "Profile": [ { "index": 4, "name": "headset-head-unit" } ] } } } ]
-[ { "id": 42, "info": null } ]`
+[ { "id": 42, "info": null } ]
+[ { "id": 60, "type": "PipeWire:Interface:Metadata", "props": { "metadata.name": "default" }, "metadata": [
+    { "subject": 0, "key": "default.audio.sink", "value": "{ \"name\": \"alsa_output.pci-0000_00_1f.3.analog-stereo\" }" } ] } ]`
 	cards, err = ParseCards([]byte(more), map[string]bool{"bluez_card.AC_BF_71_12_34_56": true, "alsa_card.pci-0000_00_1f.3": true})
-	if err != nil || len(cards) != 1 || cards[0].Profile != "headset-head-unit" || cards[0].Profiles["a2dp-sink"] != 1 {
+	if err != nil || len(cards) != 1 || cards[0].Profile != "headset-head-unit" || cards[0].Profiles["a2dp-sink"] != 1 || cards[0].Default {
 		t.Errorf("ParseCards of several arrays = %+v, %v", cards, err)
 	}
 	for _, bad := range []string{"not json", "", dump + " x"} {

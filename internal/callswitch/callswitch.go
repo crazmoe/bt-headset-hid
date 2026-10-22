@@ -20,6 +20,24 @@ type Card struct {
 	Name     string         // device.name, e.g. bluez_card.50_C2_75_0D_4E_03
 	Profile  string         // active profile
 	Profiles map[string]int // available profiles by name, with their index
+	// Default: the default output (sink) of the system is a node of this card.
+	Default bool
+}
+
+// forCall returns the headsets to switch for a call: the one that is the
+// default output if there is one, so with two connected the call goes where
+// the music plays, otherwise all of them.
+func forCall(cards []Card) []Card {
+	var def []Card
+	for _, c := range cards {
+		if c.Default {
+			def = append(def, c)
+		}
+	}
+	if len(def) > 0 {
+		return def
+	}
+	return cards
 }
 
 // IsPhone reports whether profile is a phone profile.
@@ -48,6 +66,10 @@ type Env interface {
 	Playing() ([]string, error)
 	Pause(player string) error
 	Play(player string) error
+	// Output returns the node name of the default output the user chose
+	// (default.configured.audio.sink), SetOutput chooses it.
+	Output() (string, error)
+	SetOutput(name string) error
 }
 
 // Switcher follows the call state. It is not safe for concurrent use.
@@ -55,12 +77,14 @@ type Switcher struct {
 	Env Env
 	Log func(format string, args ...any)
 	// Settle, if set, runs after headsets went back to their profile and
-	// before players resume, so that the music finds the headset again.
+	// before the default output is restored and players resume, so that the
+	// music finds the headset again.
 	Settle func()
 
 	inCall bool
 	saved  map[string]string // card name -> profile before the call
 	paused []string
+	output string // default output before the call, if a headset switched
 }
 
 func (s *Switcher) logf(format string, args ...any) {
@@ -104,8 +128,16 @@ func (s *Switcher) start() {
 	if err != nil {
 		s.logf("headsets: %v", err)
 	}
+	// The music output of a headset goes away with its profile, and the
+	// desktop may then choose another default output. Keep the old one.
+	s.output = ""
+	if out, err := s.Env.Output(); err != nil {
+		s.logf("default output: %v", err)
+	} else {
+		s.output = out
+	}
 	s.saved = map[string]string{}
-	for _, c := range cards {
+	for _, c := range forCall(cards) {
 		if IsPhone(c.Profile) {
 			continue
 		}
@@ -147,9 +179,19 @@ func (s *Switcher) end() {
 		}
 	}
 	s.saved = nil
-	if restored && len(s.paused) > 0 && s.Settle != nil {
+	if restored && s.Settle != nil && (len(s.paused) > 0 || s.output != "") {
 		s.Settle()
 	}
+	if restored && s.output != "" {
+		if out, err := s.Env.Output(); err == nil && out != s.output {
+			if err := s.Env.SetOutput(s.output); err != nil {
+				s.logf("default output %s: %v", s.output, err)
+			} else {
+				s.logf("default output: %s -> %s", out, s.output)
+			}
+		}
+	}
+	s.output = ""
 	for _, p := range s.paused {
 		if err := s.Env.Play(p); err != nil {
 			s.logf("resume %s: %v", p, err)
