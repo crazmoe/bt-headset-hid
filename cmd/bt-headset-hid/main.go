@@ -20,11 +20,13 @@ import (
 var version = "0.2.0"
 
 func main() {
-	if len(os.Args) > 1 && (os.Args[1] == "wireplumber" || os.Args[1] == "install" || os.Args[1] == "uninstall") {
+	if len(os.Args) > 1 && (os.Args[1] == "wireplumber" || os.Args[1] == "session" || os.Args[1] == "install" || os.Args[1] == "uninstall") {
 		var err error
 		switch os.Args[1] {
 		case "wireplumber":
 			err = runWirePlumber(os.Args[2:])
+		case "session":
+			err = runSession(os.Args[2:])
 		default:
 			err = runInstall(os.Args[2:], os.Args[1] == "uninstall")
 		}
@@ -41,6 +43,7 @@ func main() {
 		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid install [-mode pipewire|hfp]   (set up everything)")
 		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid uninstall")
 		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode pipewire|hfp] [-remove]   (only PipeWire, as your user)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid session   (user service of mode pipewire: phone profile during calls)")
 		flag.PrintDefaults()
 	}
 	mode := flag.String("mode", string(daemon.ModePipeWire),

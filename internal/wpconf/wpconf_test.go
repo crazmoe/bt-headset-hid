@@ -127,7 +127,7 @@ func TestDevices(t *testing.T) {
 
 func TestHeadset(t *testing.T) {
 	jabra, jbl := "50:c2:75:0d:4e:03", "AC:BF:71:12:34:56"
-	lua, err := HeadsetContent([]string{jabra, jbl, jabra}, Version{0, 4})
+	lua, err := HeadsetContent([]string{jabra, jbl, jabra}, Version{0, 4}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestHeadset(t *testing.T) {
 	if n := strings.Count(string(lua), "headset-head-unit"); n != 2 {
 		t.Errorf("%d profile rules, want 2 (duplicate address)", n)
 	}
-	conf, err := HeadsetContent([]string{jabra, jbl}, Version{0, 5})
+	conf, err := HeadsetContent([]string{jabra, jbl}, Version{0, 5}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,8 +162,15 @@ func TestHeadset(t *testing.T) {
 			t.Errorf("missing %s in conf rules\n%s", want, conf)
 		}
 	}
+	for _, v := range []Version{{0, 4}, {0, 5}} {
+		sw, err := HeadsetContent([]string{jabra}, v, false)
+		if err != nil || strings.Contains(string(sw), "device.profile") || strings.Contains(string(sw), PhoneMarker) ||
+			!strings.Contains(string(sw), `"bluez_output.bt-headset-hid.1"`) || !strings.Contains(string(sw), `"bluez_input.50_C2_75_0D_4E_03.0"`) {
+			t.Errorf("switching rules %d.%d: %v\n%s", v.Major, v.Minor, err, sw)
+		}
+	}
 	for _, bad := range [][]string{nil, {""}, {"50:C2:75:0D:4E"}, {jabra, `50:C2:75:0D:4E:0" }`}, {"50_C2_75_0D_4E_03"}} {
-		if _, err := HeadsetContent(bad, Version{0, 5}); err == nil {
+		if _, err := HeadsetContent(bad, Version{0, 5}, false); err == nil {
 			t.Errorf("HeadsetContent(%q) accepted", bad)
 		}
 	}
@@ -184,16 +191,22 @@ func TestHeadset(t *testing.T) {
 		t.Errorf("ConfiguredHeadsets from old devices = %q", got)
 	}
 
-	p4, err := InstallHeadset(dir, []string{jabra, jbl}, Version{0, 4})
+	p4, err := InstallHeadset(dir, []string{jabra, jbl}, Version{0, 4}, true)
 	if err != nil || !strings.HasSuffix(p4, filepath.Join("bluetooth.lua.d", "52-bt-headset-hid-headset.lua")) {
 		t.Fatalf("InstallHeadset 0.4 = %s, %v", p4, err)
 	}
 	if got := ConfiguredHeadsets(dir); strings.Join(got, ",") != "50:C2:75:0D:4E:03,AC:BF:71:12:34:56" {
 		t.Errorf("ConfiguredHeadsets 0.4 = %q", got)
 	}
-	p5, err := InstallHeadset(dir, []string{jbl}, Version{0, 5})
+	if !ConfiguredPhone(dir) {
+		t.Error("ConfiguredPhone = false after phone rules")
+	}
+	p5, err := InstallHeadset(dir, []string{jbl}, Version{0, 5}, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if ConfiguredPhone(dir) {
+		t.Error("ConfiguredPhone = true after switching rules")
 	}
 	if _, err := os.Stat(p4); !os.IsNotExist(err) {
 		t.Errorf("Lua rule still there after the switch to 0.5: %v", err)
@@ -203,5 +216,23 @@ func TestHeadset(t *testing.T) {
 	}
 	if removed, err := RemoveHeadset(dir); err != nil || len(removed) != 1 || removed[0] != p5 {
 		t.Fatalf("RemoveHeadset = %v, %v", removed, err)
+	}
+}
+
+func TestSessionUnit(t *testing.T) {
+	dir := t.TempDir()
+	p, err := InstallSessionUnit(dir, "/usr/local/bin/bt-headset-hid")
+	if err != nil || p != filepath.Join(dir, "systemd", "user", "bt-headset-hid-session.service") {
+		t.Fatalf("InstallSessionUnit = %s, %v", p, err)
+	}
+	data, _ := os.ReadFile(p)
+	if !strings.Contains(string(data), "\nExecStart=/usr/local/bin/bt-headset-hid session\n") {
+		t.Errorf("unit:\n%s", data)
+	}
+	if ok, err := RemoveSessionUnit(dir); !ok || err != nil {
+		t.Fatalf("RemoveSessionUnit = %v, %v", ok, err)
+	}
+	if ok, err := RemoveSessionUnit(dir); ok || err != nil {
+		t.Fatalf("second RemoveSessionUnit = %v, %v", ok, err)
 	}
 }

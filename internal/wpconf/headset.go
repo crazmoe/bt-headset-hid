@@ -51,32 +51,44 @@ func headsetIDs(addrs []string) (upper, ids []string, err error) {
 	return upper, ids, nil
 }
 
+// PhoneMarker marks headset rules that keep the headsets in the phone
+// profile all the time instead of switching for calls.
+const PhoneMarker = "bt-headset-hid-profile: phone"
+
 // HeadsetContent returns the WirePlumber rules for the headsets with the
-// Bluetooth addresses addrs. Each starts in the phone profile (HFP) instead
-// of A2DP; other Bluetooth devices keep A2DP. Without it WirePlumber puts a
-// headset into the music profile between calls, and a press on the call
-// button then often reaches the media player instead of answering.
+// Bluetooth addresses addrs.
 //
-// The rules also rename the call audio nodes of all these headsets to
+// The rules rename the call audio nodes of all these headsets to
 // HeadsetOutput and HeadsetInput, the targets of the fixed devices. If more
 // than one headset is connected, WirePlumber uses the first it finds.
-func HeadsetContent(addrs []string, v Version) ([]byte, error) {
+//
+// With phone, the headsets also start in the phone profile (HFP) instead of
+// A2DP and stay there, which needs no "bt-headset-hid session". Other
+// Bluetooth devices keep A2DP either way.
+func HeadsetContent(addrs []string, v Version, phone bool) ([]byte, error) {
 	upper, ids, err := headsetIDs(addrs)
 	if err != nil {
 		return nil, err
 	}
 	list := strings.Join(upper, ", ")
+	what := "switch to the phone profile (HFP) for calls (bt-headset-hid session)"
+	if phone {
+		what = "start in the phone profile (HFP) and stay there; " + PhoneMarker
+	}
 	var b strings.Builder
 	if v.Lua() {
-		fmt.Fprintf(&b, "-- bt-headset-hid: the headsets %s start in the phone profile (HFP), other devices keep A2DP.\n", list)
+		fmt.Fprintf(&b, "-- bt-headset-hid: the headsets %s %s.\n", list, what)
 		b.WriteString("-- ~/.config/wireplumber/bluetooth.lua.d/52-bt-headset-hid-headset.lua, written by \"bt-headset-hid wireplumber\".\n")
 		b.WriteString("-- Their call audio gets one name, so the \"bt-headset-hid\" speaker and microphone use the one connected.\n")
 		for _, id := range ids {
-			fmt.Fprintf(&b, `table.insert(bluez_monitor.rules, {
-  matches = { { { "device.name", "equals", "bluez_card.%[1]s" } } },
+			if phone {
+				fmt.Fprintf(&b, `table.insert(bluez_monitor.rules, {
+  matches = { { { "device.name", "equals", "bluez_card.%s" } } },
   apply_properties = { ["device.profile"] = "headset-head-unit" },
 })
-table.insert(bluez_monitor.rules, {
+`, id)
+			}
+			fmt.Fprintf(&b, `table.insert(bluez_monitor.rules, {
   matches = { { { "node.name", "equals", "bluez_output.%[1]s.1" }, { "factory.name", "equals", "api.bluez5.sco.sink" } } },
   apply_properties = { ["node.name"] = "%[2]s" },
 })
@@ -88,16 +100,19 @@ table.insert(bluez_monitor.rules, {
 		}
 		return []byte(b.String()), nil
 	}
-	fmt.Fprintf(&b, "# bt-headset-hid: the headsets %s start in the phone profile (HFP), other devices keep A2DP.\n", list)
+	fmt.Fprintf(&b, "# bt-headset-hid: the headsets %s %s.\n", list, what)
 	b.WriteString("# ~/.config/wireplumber/wireplumber.conf.d/52-bt-headset-hid-headset.conf, written by \"bt-headset-hid wireplumber\".\n")
 	b.WriteString("# Their call audio gets one name, so the \"bt-headset-hid\" speaker and microphone use the one connected.\n")
 	b.WriteString("monitor.bluez.rules = [\n")
 	for _, id := range ids {
-		fmt.Fprintf(&b, `  {
-    matches = [ { device.name = "bluez_card.%[1]s" } ]
+		if phone {
+			fmt.Fprintf(&b, `  {
+    matches = [ { device.name = "bluez_card.%s" } ]
     actions = { update-props = { device.profile = "headset-head-unit" } }
   }
-  {
+`, id)
+		}
+		fmt.Fprintf(&b, `  {
     matches = [ { node.name = "bluez_output.%[1]s.1", factory.name = "api.bluez5.sco.sink" } ]
     actions = { update-props = { node.name = "%[2]s" } }
   }
@@ -111,10 +126,10 @@ table.insert(bluez_monitor.rules, {
 	return []byte(b.String()), nil
 }
 
-// InstallHeadset writes the rules for the headsets addrs, removes the file of
+// InstallHeadset writes the rules for the headsets addrs (see HeadsetContent), removes the file of
 // the other format and returns the path written.
-func InstallHeadset(dir string, addrs []string, v Version) (string, error) {
-	data, err := HeadsetContent(addrs, v)
+func InstallHeadset(dir string, addrs []string, v Version, phone bool) (string, error) {
+	data, err := HeadsetContent(addrs, v, phone)
 	if err != nil {
 		return "", err
 	}
@@ -149,11 +164,20 @@ func RemoveHeadset(dir string) ([]string, error) {
 }
 
 var (
-	cardRE = regexp.MustCompile(`"bluez_card\.((?:[0-9A-F]{2}_){5}[0-9A-F]{2})"`)
-	// oldDevicesRE finds the headset in fixed devices written before the
-	// headset rules covered several headsets.
-	oldDevicesRE = regexp.MustCompile(`"bluez_output\.((?:[0-9A-F]{2}_){5}[0-9A-F]{2})\.1"`)
+	headsetRE = regexp.MustCompile(`"bluez_output\.((?:[0-9A-F]{2}_){5}[0-9A-F]{2})\.1"`)
 )
+
+// ConfiguredPhone reports whether the headset rules keep the headsets in the
+// phone profile all the time.
+func ConfiguredPhone(dir string) bool {
+	a, b := HeadsetPaths(dir, Version{0, 5})
+	for _, p := range []string{a, b} {
+		if data, err := os.ReadFile(p); err == nil && strings.Contains(string(data), PhoneMarker) {
+			return true
+		}
+	}
+	return false
+}
 
 // ConfiguredHeadsets returns the addresses of the headsets set up before, in
 // either format, or nil if there are none.
@@ -161,12 +185,12 @@ func ConfiguredHeadsets(dir string) []string {
 	a, b := HeadsetPaths(dir, Version{0, 5})
 	var addrs []string
 	seen := map[string]bool{}
-	add := func(re *regexp.Regexp, p string) {
+	add := func(p string) {
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return
 		}
-		for _, m := range re.FindAllSubmatch(data, -1) {
+		for _, m := range headsetRE.FindAllSubmatch(data, -1) {
 			addr := strings.ReplaceAll(string(m[1]), "_", ":")
 			if !seen[addr] {
 				seen[addr] = true
@@ -174,10 +198,12 @@ func ConfiguredHeadsets(dir string) []string {
 			}
 		}
 	}
-	add(cardRE, a)
-	add(cardRE, b)
+	add(a)
+	add(b)
 	if len(addrs) == 0 {
-		add(oldDevicesRE, DevicesPath(dir))
+		// Fixed devices written before the headset rules covered several
+		// headsets name the one headset the same way.
+		add(DevicesPath(dir))
 	}
 	return addrs
 }

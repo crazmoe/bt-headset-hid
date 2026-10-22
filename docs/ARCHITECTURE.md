@@ -25,12 +25,17 @@ In mode pipewire, PipeWire's native HFP backend talks to the first ModemManager 
 It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itself as the
 Bluetooth device volume.
 
-In mode pipewire WirePlumber rules for the configured headsets (`device.name = bluez_card.<address>`,
-one or more) set `device.profile = headset-head-unit`, so they start in the phone profile while
-other Bluetooth devices keep A2DP. Otherwise WirePlumber puts a headset into the music profile
-between calls, and a press on the call button then often reaches the media player instead of
-answering. A profile the user picks by hand is stored by WirePlumber and still wins. The same
-rules rename the call audio nodes of these headsets (`bluez_output.<address>.1` from
+In mode pipewire the configured headsets (one or more) play music (A2DP) between calls. The user
+service `bt-headset-hid session` watches the calls of the modem on the system bus (`Voice.Calls`,
+`Call.State`, refreshed on every signal of the modem's name). When a call is dialled, rings or
+goes on, it pauses the MPRIS players that are playing and switches the connected configured
+headsets to `headset-head-unit` (`pw-dump`, `wpctl set-profile`); two seconds after the last call
+ended it switches back the ones it switched and resumes the players it paused. The logic is in
+`callswitch`, the I/O in `desktop`. With `-profile phone`, WirePlumber rules
+(`device.name = bluez_card.<address>`) set `device.profile = headset-head-unit` instead, so the
+headsets start in the phone profile and stay there; a profile the user picks by hand is stored by
+WirePlumber and still wins. Other Bluetooth devices keep A2DP either way. WirePlumber rules also
+rename the call audio nodes of these headsets (`bluez_output.<address>.1` from
 `api.bluez5.sco.sink`, `bluez_input.<address>.0` from `api.bluez5.sco.source`) to
 `bluez_output.bt-headset-hid.1` and `bluez_input.bt-headset-hid.0`. The PipeWire configuration
 adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting these names, so
@@ -61,7 +66,9 @@ PipeWire is dropped, in case the headset reported it both ways.
 | `modem` | ModemManager modem for PipeWire: call state logic (`Calls`, pure) and its D-Bus export (`Server`) | D-Bus |
 | `bluez` | Register HFP AG / HSP AG profiles via D-Bus, receive RFCOMM fds (mode hfp) | D-Bus |
 | `daemon` | Wire everything together: `Bridge` (mapping + HID device), `Session` (one headset in mode hfp), `Run` | all |
-| `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON; in mode pipewire also the PipeWire loopbacks for the `bt-headset-hid` speaker and microphone | files |
+| `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON; in mode pipewire also the headset rules, the PipeWire loopbacks for the `bt-headset-hid` speaker and microphone and the user service for `bt-headset-hid session` | files |
+| `callswitch` | During a call: pause playing media players, switch headsets from A2DP to the phone profile, and back afterwards | none (behind an interface) |
+| `desktop` | I/O of `bt-headset-hid session`: `pw-dump`/`wpctl`, MPRIS on the session bus, the modem's call state on the system bus | commands, D-Bus |
 | `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner | files, commands |
 | `dbustest` | Private `dbus-daemon` for tests | process |
 

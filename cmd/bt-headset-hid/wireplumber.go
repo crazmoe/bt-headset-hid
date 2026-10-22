@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/crazmoe/bt-headset-hid/internal/bluez"
+	"github.com/crazmoe/bt-headset-hid/internal/install"
 	"github.com/crazmoe/bt-headset-hid/internal/wpconf"
 )
 
@@ -23,9 +25,10 @@ func runWirePlumber(args []string) error {
 	mode := fs.String("mode", "pipewire", `mode the daemon runs in: "pipewire" or "hfp"`)
 	remove := fs.Bool("remove", false, "remove the configuration instead")
 	noRestart := fs.Bool("no-restart", false, "do not restart WirePlumber and PipeWire")
+	profile := fs.String("profile", "", `-mode pipewire: "switch" plays music (A2DP) on the headsets and switches them to the phone profile for calls, pausing media players; "phone" keeps them in the phone profile (default: as before, else switch)`)
 	headset := fs.String("headset", "", `-mode pipewire: Bluetooth addresses of the headsets, comma-separated, for the phone profile and the "bt-headset-hid" speaker and microphone (default: as before, else the paired headset)`)
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode pipewire|hfp] [-headset XX:XX:XX:XX:XX:XX[,...]] [-remove] [-no-restart]")
+		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode pipewire|hfp] [-headset XX:XX:XX:XX:XX:XX[,...]] [-profile switch|phone] [-remove] [-no-restart]")
 		fmt.Fprintln(fs.Output(), "Run as your normal user, not with sudo.")
 		fs.PrintDefaults()
 	}
@@ -40,6 +43,7 @@ func runWirePlumber(args []string) error {
 		return err
 	}
 
+	session := false
 	if *remove {
 		removed, err := wpconf.Remove(dir)
 		if err == nil {
@@ -60,7 +64,11 @@ func runWirePlumber(args []string) error {
 		if devs {
 			fmt.Println("removed", wpconf.DevicesPath(dir))
 		}
-		if len(removed) == 0 && !devs {
+		unit, err := removeSession(dir)
+		if err != nil {
+			return err
+		}
+		if len(removed) == 0 && !devs && !unit {
 			fmt.Println("nothing to remove")
 		}
 	} else {
@@ -77,7 +85,11 @@ func runWirePlumber(args []string) error {
 			return err
 		}
 		fmt.Printf("WirePlumber %d.%d: wrote %s for -mode %s\n", v.Major, v.Minor, path, *mode)
-		if err := setupHeadset(dir, *mode, *headset, v); err != nil {
+		if *profile != "" && *profile != "switch" && *profile != "phone" {
+			return fmt.Errorf("-profile %q: want switch or phone", *profile)
+		}
+		session, err = setupHeadset(dir, *mode, *headset, *profile, v)
+		if err != nil {
 			return err
 		}
 	}
@@ -90,23 +102,34 @@ func runWirePlumber(args []string) error {
 		// Not every system has pipewire-pulse; try-restart ignores it then.
 		exec.Command("systemctl", "--user", "try-restart", "pipewire-pulse").Run()
 	}
+	if session {
+		if err := startSession(dir, !*noRestart); err != nil {
+			return err
+		}
+	} else if !*remove {
+		if _, err := removeSession(dir); err != nil {
+			return err
+		}
+	}
 	fmt.Println("now restart the daemon: sudo systemctl restart bt-headset-hid")
 	return nil
 }
 
-// setupHeadset sets up the headset in mode pipewire: it starts in the phone
-// profile, while other Bluetooth devices keep A2DP, and gets the fixed
-// "bt-headset-hid" speaker and microphone. Mode hfp, where PipeWire has no
-// call audio, removes both.
-func setupHeadset(dir, mode, addr string, v wpconf.Version) error {
+// setupHeadset sets up the headsets in mode pipewire: the fixed
+// "bt-headset-hid" speaker and microphone use the one connected, and with
+// profile "phone" they always stay in the phone profile, otherwise they play
+// music and "bt-headset-hid session" switches them for calls. Other Bluetooth
+// devices keep A2DP. Mode hfp, where PipeWire has no call audio, removes it
+// all. It reports whether the session service is needed.
+func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, error) {
 	if mode != "pipewire" {
 		removed, err := wpconf.RemoveHeadset(dir)
 		if err != nil {
-			return err
+			return false, err
 		}
 		ok, err := wpconf.RemoveDevices(dir)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if ok {
 			removed = append(removed, wpconf.DevicesPath(dir))
@@ -114,7 +137,13 @@ func setupHeadset(dir, mode, addr string, v wpconf.Version) error {
 		for _, p := range removed {
 			fmt.Println("removed", p)
 		}
-		return nil
+		return false, nil
+	}
+	if profile == "" {
+		profile = "switch"
+		if wpconf.ConfiguredPhone(dir) {
+			profile = "phone"
+		}
 	}
 	var addrs []string
 	for _, a := range strings.Split(addr, ",") {
@@ -136,22 +165,80 @@ func setupHeadset(dir, mode, addr string, v wpconf.Version) error {
 		if err != nil {
 			fmt.Printf("no phone profile and no speaker and microphone \"bt-headset-hid\": %v\n", err)
 			fmt.Println("  pair the headset, then run this again, or pass -headset XX:XX:XX:XX:XX:XX")
-			return nil
+			return false, nil
 		}
 		addrs, name = []string{h.Address}, fmt.Sprintf("%s (%s)", h.Name, h.Address)
 	}
-	path, err := wpconf.InstallHeadset(dir, addrs, v)
+	path, err := wpconf.InstallHeadset(dir, addrs, v, profile == "phone")
 	if err != nil {
-		return err
+		return false, err
 	}
-	fmt.Printf("wrote %s: %s start in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
+	if profile == "phone" {
+		fmt.Printf("wrote %s: %s stay in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
+	} else {
+		fmt.Printf("wrote %s: %s\n", path, name)
+		fmt.Println("  they play music (A2DP) and switch to the phone profile for calls; always the phone profile: -profile phone")
+	}
 	path, err = wpconf.InstallDevices(dir)
 	if err != nil {
-		return err
+		return false, err
 	}
 	fmt.Printf("wrote %s: speaker and microphone \"bt-headset-hid\" for the connected headset\n", path)
 	fmt.Println("  choose \"bt-headset-hid\" in the softphone for the phone device, the speaker and the microphone")
+	return profile != "phone", nil
+}
+
+// startSession writes and enables the user service "bt-headset-hid session"
+// and, with restart, (re)starts it.
+func startSession(dir string, restart bool) error {
+	path, err := wpconf.InstallSessionUnit(dir, sessionBinary())
+	if err != nil {
+		return err
+	}
+	fmt.Printf("wrote %s: during calls it switches the headsets to the phone profile and pauses media players\n", path)
+	cmds := [][]string{{"daemon-reload"}, {"enable", wpconf.SessionUnit}}
+	if restart {
+		cmds = append(cmds, []string{"restart", wpconf.SessionUnit})
+	}
+	for _, c := range cmds {
+		if out, err := exec.Command("systemctl", append([]string{"--user"}, c...)...).CombinedOutput(); err != nil {
+			return fmt.Errorf("systemctl --user %s: %v: %s", strings.Join(c, " "), err, out)
+		}
+	}
 	return nil
+}
+
+// removeSession stops and removes the user service and reports whether it
+// existed.
+func removeSession(dir string) (bool, error) {
+	if _, err := os.Stat(wpconf.SessionUnitPath(dir)); err != nil {
+		return false, nil
+	}
+	exec.Command("systemctl", "--user", "disable", "--now", wpconf.SessionUnit).Run()
+	ok, err := wpconf.RemoveSessionUnit(dir)
+	if ok {
+		fmt.Println("removed", wpconf.SessionUnitPath(dir))
+		exec.Command("systemctl", "--user", "daemon-reload").Run()
+	}
+	return ok, err
+}
+
+// sessionBinary is the program the session service runs: the installed one
+// if there is one, else this one.
+func sessionBinary() string {
+	for _, p := range []string{install.Binary, install.PackagedBinary} {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return install.Binary
+	}
+	if p, err := filepath.EvalSymlinks(self); err == nil {
+		self = p
+	}
+	return self
 }
 
 // droppedHeadsets returns the headsets of before that are not in addrs.
