@@ -24,3 +24,14 @@ func TestAskMode(t *testing.T) {
 		}
 	}
 }
+
+func TestDroppedHeadsets(t *testing.T) {
+	before := []string{"50:C2:75:0D:4E:03", "84:D3:52:8C:B9:D0"}
+	got := droppedHeadsets(before, []string{"84:d3:52:8c:b9:d0"})
+	if len(got) != 1 || got[0] != "50:C2:75:0D:4E:03" {
+		t.Errorf("droppedHeadsets = %q", got)
+	}
+	if got := droppedHeadsets(before, []string{"84:D3:52:8C:B9:D0", "50:c2:75:0d:4e:03"}); got != nil {
+		t.Errorf("droppedHeadsets with both = %q", got)
+	}
+}

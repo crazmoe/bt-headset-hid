@@ -123,6 +123,10 @@ func setupHeadset(dir, mode, addr string, v wpconf.Version) error {
 		}
 	}
 	name := strings.Join(addrs, ", ")
+	if dropped := droppedHeadsets(wpconf.ConfiguredHeadsets(dir), addrs); len(addrs) > 0 && len(dropped) > 0 {
+		fmt.Printf("no longer set up: %s; to keep them too: -headset %s\n",
+			strings.Join(dropped, ", "), strings.Join(append(addrs, dropped...), ","))
+	}
 	if len(addrs) == 0 {
 		addrs = wpconf.ConfiguredHeadsets(dir)
 		name = strings.Join(addrs, ", ") + " (as before; others: -headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY)"
@@ -148,6 +152,23 @@ func setupHeadset(dir, mode, addr string, v wpconf.Version) error {
 	fmt.Printf("wrote %s: speaker and microphone \"bt-headset-hid\" for the connected headset\n", path)
 	fmt.Println("  choose \"bt-headset-hid\" in the softphone for the phone device, the speaker and the microphone")
 	return nil
+}
+
+// droppedHeadsets returns the headsets of before that are not in addrs.
+func droppedHeadsets(before, addrs []string) []string {
+	var dropped []string
+	for _, b := range before {
+		found := false
+		for _, a := range addrs {
+			if strings.EqualFold(a, b) {
+				found = true
+			}
+		}
+		if !found {
+			dropped = append(dropped, b)
+		}
+	}
+	return dropped
 }
 
 // findHeadset asks BlueZ for the paired headset.
