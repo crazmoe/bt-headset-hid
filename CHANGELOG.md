@@ -8,6 +8,15 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
+## Unreleased
+
+- pipewire mode: only the headset bt-headset-hid serves starts in the phone profile; other
+  Bluetooth headphones and speakers keep music (A2DP) again. `bt-headset-hid wireplumber`
+  keeps the headsets set up before and takes `-headset` to change them.
+- pipewire mode: several headsets, e.g. one for the office and one for home:
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. The `bt-headset-hid` speaker and microphone
+  use whichever of them is connected.
+
 ## 0.2.0
 
 - Release packages: `.deb` and `.rpm` for amd64 and arm64 in addition to the tarballs.

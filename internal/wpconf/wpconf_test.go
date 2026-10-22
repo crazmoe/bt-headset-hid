@@ -35,8 +35,6 @@ func TestContent(t *testing.T) {
 	}{
 		{"hfp", Version{0, 4}, `bluez5.headset-roles`},
 		{"pipewire", Version{0, 4}, `["bluez5.hfphsp-backend-native-modem"] = "any"`},
-		{"pipewire", Version{0, 4}, `["bluez5.roles"] = "[ hfp_hf hfp_ag ]"`},
-		{"pipewire", Version{0, 5}, `bluez5.roles = [ hfp_hf hfp_ag ]`},
 		{"hfp", Version{0, 5}, `bluez5.roles = [ a2dp_sink a2dp_source ]`},
 		{"pipewire", Version{0, 5}, `bluez5.hfphsp-backend-native-modem = "any"`},
 	} {
@@ -101,13 +99,10 @@ func TestInstallSwitchesFormat(t *testing.T) {
 }
 
 func TestDevices(t *testing.T) {
-	b, err := DevicesContent("50:c2:75:0d:4e:03")
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := DevicesContent()
 	for _, want := range []string{
-		`target.object = "bluez_output.50_C2_75_0D_4E_03.1"`,
-		`target.object = "bluez_input.50_C2_75_0D_4E_03.0"`,
+		`target.object = "bluez_output.bt-headset-hid.1"`,
+		`target.object = "bluez_input.bt-headset-hid.0"`,
 		`node.description = "bt-headset-hid"`,
 		`media.class = "Audio/Sink"`,
 		`media.class = "Audio/Source"`,
@@ -116,14 +111,9 @@ func TestDevices(t *testing.T) {
 			t.Errorf("missing %s in\n%s", want, b)
 		}
 	}
-	for _, bad := range []string{"", "50:C2:75:0D:4E", `50:C2:75:0D:4E:0" ]`, "50_C2_75_0D_4E_03"} {
-		if _, err := DevicesContent(bad); err == nil {
-			t.Errorf("DevicesContent(%q) accepted", bad)
-		}
-	}
 
 	dir := t.TempDir()
-	p, err := InstallDevices(dir, "50:C2:75:0D:4E:03")
+	p, err := InstallDevices(dir)
 	if err != nil || p != filepath.Join(dir, "pipewire", "pipewire.conf.d", "51-bt-headset-hid.conf") {
 		t.Fatalf("InstallDevices = %s, %v", p, err)
 	}
@@ -132,5 +122,86 @@ func TestDevices(t *testing.T) {
 	}
 	if ok, err := RemoveDevices(dir); ok || err != nil {
 		t.Fatalf("second RemoveDevices = %v, %v", ok, err)
+	}
+}
+
+func TestHeadset(t *testing.T) {
+	jabra, jbl := "50:c2:75:0d:4e:03", "AC:BF:71:12:34:56"
+	lua, err := HeadsetContent([]string{jabra, jbl, jabra}, Version{0, 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`{ "device.name", "equals", "bluez_card.50_C2_75_0D_4E_03" }`,
+		`{ "device.name", "equals", "bluez_card.AC_BF_71_12_34_56" }`,
+		`["device.profile"] = "headset-head-unit"`,
+		`{ { "node.name", "equals", "bluez_output.AC_BF_71_12_34_56.1" }, { "factory.name", "equals", "api.bluez5.sco.sink" } }`,
+		`{ { "node.name", "equals", "bluez_input.50_C2_75_0D_4E_03.0" }, { "factory.name", "equals", "api.bluez5.sco.source" } }`,
+		`["node.name"] = "bluez_output.bt-headset-hid.1"`,
+		`["node.name"] = "bluez_input.bt-headset-hid.0"`,
+	} {
+		if !strings.Contains(string(lua), want) {
+			t.Errorf("missing %s in Lua rules\n%s", want, lua)
+		}
+	}
+	if n := strings.Count(string(lua), "headset-head-unit"); n != 2 {
+		t.Errorf("%d profile rules, want 2 (duplicate address)", n)
+	}
+	conf, err := HeadsetContent([]string{jabra, jbl}, Version{0, 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`device.name = "bluez_card.50_C2_75_0D_4E_03"`,
+		`device.name = "bluez_card.AC_BF_71_12_34_56"`,
+		`device.profile = "headset-head-unit"`,
+		`{ node.name = "bluez_output.AC_BF_71_12_34_56.1", factory.name = "api.bluez5.sco.sink" }`,
+		`update-props = { node.name = "bluez_input.bt-headset-hid.0" }`,
+	} {
+		if !strings.Contains(string(conf), want) {
+			t.Errorf("missing %s in conf rules\n%s", want, conf)
+		}
+	}
+	for _, bad := range [][]string{nil, {""}, {"50:C2:75:0D:4E"}, {jabra, `50:C2:75:0D:4E:0" }`}, {"50_C2_75_0D_4E_03"}} {
+		if _, err := HeadsetContent(bad, Version{0, 5}); err == nil {
+			t.Errorf("HeadsetContent(%q) accepted", bad)
+		}
+	}
+
+	dir := t.TempDir()
+	if got := ConfiguredHeadsets(dir); got != nil {
+		t.Errorf("ConfiguredHeadsets without rules = %q", got)
+	}
+	// Fixed devices from before carry the one headset's address.
+	old := DevicesPath(dir)
+	if err := os.MkdirAll(filepath.Dir(old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, []byte(`target.object = "bluez_output.50_C2_75_0D_4E_03.1"`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ConfiguredHeadsets(dir); len(got) != 1 || got[0] != "50:C2:75:0D:4E:03" {
+		t.Errorf("ConfiguredHeadsets from old devices = %q", got)
+	}
+
+	p4, err := InstallHeadset(dir, []string{jabra, jbl}, Version{0, 4})
+	if err != nil || !strings.HasSuffix(p4, filepath.Join("bluetooth.lua.d", "52-bt-headset-hid-headset.lua")) {
+		t.Fatalf("InstallHeadset 0.4 = %s, %v", p4, err)
+	}
+	if got := ConfiguredHeadsets(dir); strings.Join(got, ",") != "50:C2:75:0D:4E:03,AC:BF:71:12:34:56" {
+		t.Errorf("ConfiguredHeadsets 0.4 = %q", got)
+	}
+	p5, err := InstallHeadset(dir, []string{jbl}, Version{0, 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(p4); !os.IsNotExist(err) {
+		t.Errorf("Lua rule still there after the switch to 0.5: %v", err)
+	}
+	if got := ConfiguredHeadsets(dir); strings.Join(got, ",") != "AC:BF:71:12:34:56" {
+		t.Errorf("ConfiguredHeadsets 0.5 = %q", got)
+	}
+	if removed, err := RemoveHeadset(dir); err != nil || len(removed) != 1 || removed[0] != p5 {
+		t.Fatalf("RemoveHeadset = %v, %v", removed, err)
 	}
 }

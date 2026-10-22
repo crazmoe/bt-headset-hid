@@ -24,7 +24,7 @@ HFP. So you choose:
 |---|---|---|
 | Who owns HFP | PipeWire | bt-headset-hid |
 | Call audio (headset mic and speaker) | yes, as speaker and microphone "bt-headset-hid" | no (A2DP music only) |
-| Music over the headset | phone quality (no A2DP, the headset stays ready for calls) | A2DP |
+| Music over the headset | phone quality: it stays in the phone profile, ready for calls; other Bluetooth devices keep A2DP | A2DP |
 | Answer / hang up / reject | yes | yes |
 | Redial, volume keys, HSP button | no | yes |
 | Call button outside a call, if the headset sends it as AVRCP play/pause | to the media player (`-grab-media-keys`: to the softphone) | to the softphone |
@@ -85,14 +85,15 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    open the device, the systemd service with the chosen mode, for `pipewire` the D-Bus policy and
    switching off ModemManager, and the WirePlumber configuration of your user (0.4 or 0.5,
    detected automatically). In `-mode pipewire` it also creates a speaker and a microphone named
-   `bt-headset-hid` for the paired headset. Run it again to switch modes; `sudo bt-headset-hid uninstall`
+   `bt-headset-hid` for the paired headset (for several headsets see `-headset` below). Run it again to switch modes; `sudo bt-headset-hid uninstall`
    removes everything.
 
 3. **Connect the headset** as usual (`bluetoothctl` or your desktop; reconnect it if it was
    already connected) and watch `journalctl -u bt-headset-hid -f` for "headset … connected".
-   In `-mode pipewire` the headset only offers the phone profile (HFP), so it is always ready
-   for calls. If you paired it only after `install`, run `bt-headset-hid wireplumber` once as
-   your user so the `bt-headset-hid` speaker and microphone point to it.
+   In `-mode pipewire` the headset starts in the phone profile (HFP), so it is always ready
+   for calls; other Bluetooth headphones and speakers keep playing music (A2DP). If you paired
+   the headset only after `install`, run `bt-headset-hid wireplumber` once as your user so the
+   phone profile and the `bt-headset-hid` speaker and microphone apply to it.
 
 4. **Select the device in the softphone.** It is called `bt-headset-hid`. In `-mode pipewire`
    also choose `bt-headset-hid` as speaker and microphone: these always exist, pass the sound to
@@ -109,9 +110,13 @@ What `install` does, step by step, if you prefer to do it yourself:
   `~/.config/wireplumber/bluetooth.lua.d/`, 0.5 and later: `~/.config/wireplumber/wireplumber.conf.d/`),
   removes the file of the other version and restarts PipeWire; `-remove` undoes it. By hand: copy
   the matching file from `contrib/wireplumber/` to the path written in its first lines.
-  In `-mode pipewire` it also writes `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf`
-  with the `bt-headset-hid` speaker and microphone for the paired headset (several headsets:
-  `-headset XX:XX:XX:XX:XX:XX`).
+  In `-mode pipewire` it also sets up the headsets: a WirePlumber rule
+  (`52-bt-headset-hid-headset.lua` or `.conf`) starts them in the phone profile, and
+  `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` adds the `bt-headset-hid` speaker
+  and microphone, which use whichever of them is connected (with two connected, the first one
+  PipeWire finds). It takes the headsets set up before, otherwise the paired one; to set up
+  several, e.g. one for the office and one for home, or to change them:
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`.
 - Only for `-mode pipewire`: `sudo systemctl disable --now ModemManager` (mobile broadband modems
   stop working while bt-headset-hid runs) and
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire must be built with

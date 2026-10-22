@@ -25,13 +25,18 @@ In mode pipewire, PipeWire's native HFP backend talks to the first ModemManager 
 It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itself as the
 Bluetooth device volume.
 
-In mode pipewire the WirePlumber configuration leaves out A2DP (`bluez5.roles = [ hfp_hf hfp_ag ]`):
-with A2DP, WirePlumber switches the headset to the music profile between calls, and a press on
-the call button then often reaches the media player instead of answering. The PipeWire
-configuration adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting
-`bluez_output.<address>.1` and `bluez_input.<address>.0`. Their side towards the headset is
-passive, so the call audio only runs while a program uses them; without the headset WirePlumber
-connects them to the default devices.
+In mode pipewire WirePlumber rules for the configured headsets (`device.name = bluez_card.<address>`,
+one or more) set `device.profile = headset-head-unit`, so they start in the phone profile while
+other Bluetooth devices keep A2DP. Otherwise WirePlumber puts a headset into the music profile
+between calls, and a press on the call button then often reaches the media player instead of
+answering. A profile the user picks by hand is stored by WirePlumber and still wins. The same
+rules rename the call audio nodes of these headsets (`bluez_output.<address>.1` from
+`api.bluez5.sco.sink`, `bluez_input.<address>.0` from `api.bluez5.sco.source`) to
+`bluez_output.bt-headset-hid.1` and `bluez_input.bt-headset-hid.0`. The PipeWire configuration
+adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting these names, so
+they follow whichever headset is connected; with two connected, WirePlumber takes the first it
+finds. Their side towards the headset is passive, so the call audio only runs while a program
+uses them; without a headset WirePlumber connects them to the default devices.
 
 Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
 passes an Active that follows Idle on to the modem only after one second, and drops it when
