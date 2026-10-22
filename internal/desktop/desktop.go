@@ -53,22 +53,26 @@ func (s System) Cards() ([]callswitch.Card, error) {
 	return callswitch.ParseCards(out, s.Names)
 }
 
-func (s System) Output() (string, error) {
+func (s System) Default(kind string) (string, error) {
 	out, err := exec.Command("pw-dump").Output()
 	if err != nil {
 		return "", fmt.Errorf("pw-dump: %w", err)
 	}
-	return callswitch.ParseOutput(out)
+	return callswitch.ParseDefault(out, kind)
 }
 
-func (s System) SetOutput(name string) error {
-	v, err := json.Marshal(struct {
-		Name string `json:"name"`
-	}{name})
-	if err != nil {
-		return err
+func (s System) SetDefault(kind, name string) error {
+	args := []string{"-n", "default", "-d", "0", kind}
+	if name != "" {
+		v, err := json.Marshal(struct {
+			Name string `json:"name"`
+		}{name})
+		if err != nil {
+			return err
+		}
+		args = []string{"-n", "default", "0", kind, string(v), "Spa:String:JSON"}
 	}
-	out, err := exec.Command("pw-metadata", "-n", "default", "0", "default.configured.audio.sink", string(v), "Spa:String:JSON").CombinedOutput()
+	out, err := exec.Command("pw-metadata", args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("pw-metadata: %v: %s", err, strings.TrimSpace(string(out)))
 	}

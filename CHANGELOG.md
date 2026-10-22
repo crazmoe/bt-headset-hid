@@ -22,6 +22,8 @@ version and the output of `journalctl -u bt-headset-hid`, as a
   phone profile all the time instead. With two headsets connected, only the one chosen as
   output in the sound settings switches, so the call goes where the music plays. WirePlumber's
   own switch to the phone profile, which switched every Bluetooth headset, is turned off then.
+  During the call "bt-headset-hid" is the default speaker and microphone, so programs that lost
+  their device still reach the headset; afterwards the previous defaults come back.
 
 ## 0.2.0
 

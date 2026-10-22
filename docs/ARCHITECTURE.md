@@ -30,7 +30,11 @@ service `bt-headset-hid session` watches the calls of the modem on the system bu
 `Call.State`, refreshed on every signal of the modem's name). When a call is dialled, rings or
 goes on, it pauses the MPRIS players that are playing and switches the connected configured
 headsets to `headset-head-unit` (`pw-dump`, `wpctl set-profile`); two seconds after the last call
-ended it switches back the ones it switched and resumes the players it paused. The logic is in
+ended it switches back the ones it switched and resumes the players it paused. While a headset is
+switched it also makes the `bt-headset-hid` speaker and microphone the configured defaults
+(`pw-metadata`), and restores the previous ones afterwards: the headset's music output goes away
+with its profile, and streams whose target vanished (a softphone may pin a node id that the next
+profile switch recreates) would otherwise fall back to another headset or the laptop. The logic is in
 `callswitch`, the I/O in `desktop`. With `-profile phone`, WirePlumber rules
 (`device.name = bluez_card.<address>`) set `device.profile = headset-head-unit` instead, so the
 headsets start in the phone profile and stay there; a profile the user picks by hand is stored by

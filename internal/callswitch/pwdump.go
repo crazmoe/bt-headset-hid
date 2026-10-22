@@ -125,9 +125,9 @@ func sinkName(raw json.RawMessage) string {
 	return v.Name
 }
 
-// ParseOutput returns the default output the user chose
-// (default.configured.audio.sink) from the output of pw-dump, or "".
-func ParseOutput(dump []byte) (string, error) {
+// ParseDefault returns the default device the user chose for kind (SinkKey
+// or SourceKey) from the output of pw-dump, or "".
+func ParseDefault(dump []byte, kind string) (string, error) {
 	type object struct {
 		Type     string         `json:"type"`
 		Props    map[string]any `json:"props"`
@@ -153,7 +153,7 @@ func ParseOutput(dump []byte) (string, error) {
 				continue
 			}
 			for _, m := range o.Metadata {
-				if m.Subject == 0 && m.Key == "default.configured.audio.sink" {
+				if m.Subject == 0 && m.Key == kind {
 					out = sinkName(m.Value)
 				}
 			}

@@ -66,25 +66,38 @@ type Env interface {
 	Playing() ([]string, error)
 	Pause(player string) error
 	Play(player string) error
-	// Output returns the node name of the default output the user chose
-	// (default.configured.audio.sink), SetOutput chooses it.
-	Output() (string, error)
-	SetOutput(name string) error
+	// Default returns the node name of the default device the user chose
+	// for kind (SinkKey or SourceKey), SetDefault chooses it; "" unsets it.
+	Default(kind string) (string, error)
+	SetDefault(kind, name string) error
 }
+
+// Kinds of default devices: the keys of their choice in the "default"
+// metadata of PipeWire.
+const (
+	SinkKey   = "default.configured.audio.sink"
+	SourceKey = "default.configured.audio.source"
+)
 
 // Switcher follows the call state. It is not safe for concurrent use.
 type Switcher struct {
 	Env Env
 	Log func(format string, args ...any)
+	// CallSink and CallSource, if set, become the default devices while a
+	// headset is switched for a call: the "bt-headset-hid" speaker and
+	// microphone, which lead to that headset. Programs that lost their
+	// device, such as a softphone whose stream still points at the phone
+	// output of an earlier call, then land there too.
+	CallSink, CallSource string
 	// Settle, if set, runs after headsets went back to their profile and
-	// before the default output is restored and players resume, so that the
-	// music finds the headset again.
+	// before the default devices are restored and players resume, so that
+	// the music finds the headset again.
 	Settle func()
 
-	inCall bool
-	saved  map[string]string // card name -> profile before the call
-	paused []string
-	output string // default output before the call, if a headset switched
+	inCall   bool
+	saved    map[string]string // card name -> profile before the call
+	paused   []string
+	defaults map[string]string // kind -> default before the call, if set for the call
 }
 
 func (s *Switcher) logf(format string, args ...any) {
@@ -128,14 +141,6 @@ func (s *Switcher) start() {
 	if err != nil {
 		s.logf("headsets: %v", err)
 	}
-	// The music output of a headset goes away with its profile, and the
-	// desktop may then choose another default output. Keep the old one.
-	s.output = ""
-	if out, err := s.Env.Output(); err != nil {
-		s.logf("default output: %v", err)
-	} else {
-		s.output = out
-	}
 	s.saved = map[string]string{}
 	for _, c := range forCall(cards) {
 		if IsPhone(c.Profile) {
@@ -152,6 +157,33 @@ func (s *Switcher) start() {
 		}
 		s.logf("%s: %s -> %s", c.Name, c.Profile, phone)
 		s.saved[c.Name] = c.Profile
+	}
+	if len(s.saved) > 0 {
+		s.setDefaults()
+	}
+}
+
+// setDefaults makes CallSink and CallSource the default devices and keeps
+// the ones before. The music output of a headset goes away with its
+// profile, and the desktop would otherwise pick another one, such as a
+// second headset.
+func (s *Switcher) setDefaults() {
+	s.defaults = map[string]string{}
+	for _, d := range [][2]string{{SinkKey, s.CallSink}, {SourceKey, s.CallSource}} {
+		kind, name := d[0], d[1]
+		if name == "" {
+			continue
+		}
+		old, err := s.Env.Default(kind)
+		if err != nil {
+			s.logf("%s: %v", kind, err)
+			continue
+		}
+		if err := s.Env.SetDefault(kind, name); err != nil {
+			s.logf("%s %s: %v", kind, name, err)
+			continue
+		}
+		s.defaults[kind] = old
 	}
 }
 
@@ -179,19 +211,19 @@ func (s *Switcher) end() {
 		}
 	}
 	s.saved = nil
-	if restored && s.Settle != nil && (len(s.paused) > 0 || s.output != "") {
+	if restored && s.Settle != nil && (len(s.paused) > 0 || len(s.defaults) > 0) {
 		s.Settle()
 	}
-	if restored && s.output != "" {
-		if out, err := s.Env.Output(); err == nil && out != s.output {
-			if err := s.Env.SetOutput(s.output); err != nil {
-				s.logf("default output %s: %v", s.output, err)
-			} else {
-				s.logf("default output: %s -> %s", out, s.output)
-			}
+	for _, kind := range []string{SinkKey, SourceKey} {
+		old, ok := s.defaults[kind]
+		if !ok {
+			continue
+		}
+		if err := s.Env.SetDefault(kind, old); err != nil {
+			s.logf("%s %s: %v", kind, old, err)
 		}
 	}
-	s.output = ""
+	s.defaults = nil
 	for _, p := range s.paused {
 		if err := s.Env.Play(p); err != nil {
 			s.logf("resume %s: %v", p, err)

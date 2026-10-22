@@ -66,9 +66,12 @@ func runSession(args []string) error {
 	}
 
 	sw := &callswitch.Switcher{
-		Env:    desktop.System{Session: sess, Names: names, Skip: desktop.Softphones},
-		Log:    logger.Printf,
-		Settle: func() { time.Sleep(2 * time.Second) },
+		Env: desktop.System{Session: sess, Names: names, Skip: desktop.Softphones},
+		Log: logger.Printf,
+		// The fixed devices of wpconf.DevicesContent.
+		CallSink:   "bt-headset-hid.speaker",
+		CallSource: "bt-headset-hid.microphone",
+		Settle:     func() { time.Sleep(2 * time.Second) },
 	}
 	logger.Printf("switching %s to the phone profile during calls", strings.Join(addrs, ", "))
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

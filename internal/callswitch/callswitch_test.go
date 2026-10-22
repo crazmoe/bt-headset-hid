@@ -9,21 +9,21 @@ import (
 )
 
 type fakeEnv struct {
-	cards   []Card
-	playing []string
-	log     []string
-	failSet bool
-	output  string
-	// moveOutput is the default output the desktop picks when a headset
-	// leaves the music profile.
-	moveOutput string
+	cards    []Card
+	playing  []string
+	log      []string
+	failSet  bool
+	defaults map[string]string
 }
 
-func (f *fakeEnv) Output() (string, error) { return f.output, nil }
+func (f *fakeEnv) Default(kind string) (string, error) { return f.defaults[kind], nil }
 
-func (f *fakeEnv) SetOutput(name string) error {
-	f.log = append(f.log, "output "+name)
-	f.output = name
+func (f *fakeEnv) SetDefault(kind, name string) error {
+	f.log = append(f.log, kind+" "+name)
+	if f.defaults == nil {
+		f.defaults = map[string]string{}
+	}
+	f.defaults[kind] = name
 	return nil
 }
 
@@ -34,9 +34,6 @@ func (f *fakeEnv) SetProfile(c Card, profile string) error {
 		return fmt.Errorf("busy")
 	}
 	f.log = append(f.log, "profile "+c.Name+" "+profile)
-	if IsPhone(profile) && f.moveOutput != "" {
-		f.output = f.moveOutput
-	}
 	for i := range f.cards {
 		if f.cards[i].Name == c.Name {
 			f.cards[i].Profile = profile
@@ -105,16 +102,24 @@ func TestSwitcherDefaultOutput(t *testing.T) {
 	}
 }
 
-func TestSwitcherRestoresOutput(t *testing.T) {
+func TestSwitcherCallDefaults(t *testing.T) {
 	jbl, jabra := card("bluez_card.JBL", "a2dp-sink"), card("bluez_card.JABRA", "a2dp-sink")
 	jabra.Default = true
-	env := &fakeEnv{cards: []Card{jbl, jabra}, output: "bluez_output.JABRA.1", moveOutput: "bluez_output.JBL.1"}
-	s := &Switcher{Env: env, Settle: func() { env.log = append(env.log, "settle") }}
+	env := &fakeEnv{cards: []Card{jbl, jabra}, defaults: map[string]string{SinkKey: "bluez_output.JABRA.1"}}
+	s := &Switcher{Env: env, CallSink: "bt-headset-hid.speaker", CallSource: "bt-headset-hid.microphone",
+		Settle: func() { env.log = append(env.log, "settle") }}
 	s.Call(true)
-	s.Call(false)
-	want := []string{"profile bluez_card.JABRA headset-head-unit", "profile bluez_card.JABRA a2dp-sink", "settle", "output bluez_output.JABRA.1"}
+	want := []string{"profile bluez_card.JABRA headset-head-unit",
+		SinkKey + " bt-headset-hid.speaker", SourceKey + " bt-headset-hid.microphone"}
 	if !reflect.DeepEqual(env.log, want) {
-		t.Errorf("log %q, want %q", env.log, want)
+		t.Fatalf("call start: %q, want %q", env.log, want)
+	}
+	env.defaults[SinkKey] = "bluez_output.JBL.1" // the desktop changed it meanwhile
+	env.log = nil
+	s.Call(false)
+	want = []string{"profile bluez_card.JABRA a2dp-sink", "settle", SinkKey + " bluez_output.JABRA.1", SourceKey + " "}
+	if !reflect.DeepEqual(env.log, want) {
+		t.Errorf("call end: %q, want %q", env.log, want)
 	}
 }
 
@@ -197,15 +202,15 @@ const dump = `[
   { "id": 43, "type": "PipeWire:Interface:Device", "info": null }
 ]`
 
-func TestParseOutput(t *testing.T) {
-	out, err := ParseOutput([]byte(dump))
+func TestParseDefault(t *testing.T) {
+	out, err := ParseDefault([]byte(dump), SinkKey)
 	if err != nil || out != "alsa_output.pci-0000_00_1f.3.analog-stereo" {
-		t.Errorf("ParseOutput = %q, %v", out, err)
+		t.Errorf("ParseDefault = %q, %v", out, err)
 	}
-	if out, err := ParseOutput([]byte("[]")); out != "" || err != nil {
-		t.Errorf("ParseOutput without metadata = %q, %v", out, err)
+	if out, err := ParseDefault([]byte(dump), SourceKey); out != "" || err != nil {
+		t.Errorf("ParseDefault without source = %q, %v", out, err)
 	}
-	if _, err := ParseOutput([]byte("x")); err == nil {
+	if _, err := ParseDefault([]byte("x"), SinkKey); err == nil {
 		t.Error("bad dump accepted")
 	}
 }
