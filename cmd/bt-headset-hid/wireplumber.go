@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/godbus/dbus/v5"
 
@@ -22,9 +23,9 @@ func runWirePlumber(args []string) error {
 	mode := fs.String("mode", "pipewire", `mode the daemon runs in: "pipewire" or "hfp"`)
 	remove := fs.Bool("remove", false, "remove the configuration instead")
 	noRestart := fs.Bool("no-restart", false, "do not restart WirePlumber and PipeWire")
-	headset := fs.String("headset", "", `-mode pipewire: Bluetooth address of the headset for the "bt-headset-hid" speaker and microphone (default: the paired headset)`)
+	headset := fs.String("headset", "", `-mode pipewire: Bluetooth addresses of the headsets, comma-separated, for the phone profile and the "bt-headset-hid" speaker and microphone (default: as before, else the paired headset)`)
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode pipewire|hfp] [-headset XX:XX:XX:XX:XX:XX] [-remove] [-no-restart]")
+		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode pipewire|hfp] [-headset XX:XX:XX:XX:XX:XX[,...]] [-remove] [-no-restart]")
 		fmt.Fprintln(fs.Output(), "Run as your normal user, not with sudo.")
 		fs.PrintDefaults()
 	}
@@ -115,30 +116,36 @@ func setupHeadset(dir, mode, addr string, v wpconf.Version) error {
 		}
 		return nil
 	}
-	name := addr
-	if addr == "" {
-		addr = wpconf.ConfiguredHeadset(dir)
-		name = addr + " (as before; another headset: -headset XX:XX:XX:XX:XX:XX)"
+	var addrs []string
+	for _, a := range strings.Split(addr, ",") {
+		if a = strings.TrimSpace(a); a != "" {
+			addrs = append(addrs, a)
+		}
 	}
-	if addr == "" {
+	name := strings.Join(addrs, ", ")
+	if len(addrs) == 0 {
+		addrs = wpconf.ConfiguredHeadsets(dir)
+		name = strings.Join(addrs, ", ") + " (as before; others: -headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY)"
+	}
+	if len(addrs) == 0 {
 		h, err := findHeadset()
 		if err != nil {
 			fmt.Printf("no phone profile and no speaker and microphone \"bt-headset-hid\": %v\n", err)
 			fmt.Println("  pair the headset, then run this again, or pass -headset XX:XX:XX:XX:XX:XX")
 			return nil
 		}
-		addr, name = h.Address, fmt.Sprintf("%s (%s)", h.Name, h.Address)
+		addrs, name = []string{h.Address}, fmt.Sprintf("%s (%s)", h.Name, h.Address)
 	}
-	path, err := wpconf.InstallHeadset(dir, addr, v)
+	path, err := wpconf.InstallHeadset(dir, addrs, v)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("wrote %s: %s starts in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
-	path, err = wpconf.InstallDevices(dir, addr)
+	fmt.Printf("wrote %s: %s start in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
+	path, err = wpconf.InstallDevices(dir)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("wrote %s: speaker and microphone \"bt-headset-hid\" for %s\n", path, name)
+	fmt.Printf("wrote %s: speaker and microphone \"bt-headset-hid\" for the connected headset\n", path)
 	fmt.Println("  choose \"bt-headset-hid\" in the softphone for the phone device, the speaker and the microphone")
 	return nil
 }
@@ -160,9 +167,12 @@ func findHeadset() (bluez.Headset, error) {
 	if len(hs) == 0 {
 		return bluez.Headset{}, errors.New("no paired headset found")
 	}
-	msg := "several headsets, connect only the one to use or pick one:"
+	var all []string
+	msg := "several headsets, pick them (comma-separated) or connect only the one to use:"
 	for _, h := range hs {
 		msg += fmt.Sprintf("\n    -headset %s   %s", h.Address, h.Name)
+		all = append(all, h.Address)
 	}
+	msg += fmt.Sprintf("\n    -headset %s   all of them", strings.Join(all, ","))
 	return bluez.Headset{}, errors.New(msg)
 }

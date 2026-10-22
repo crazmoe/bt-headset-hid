@@ -12,7 +12,10 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 
 - pipewire mode: only the headset bt-headset-hid serves starts in the phone profile; other
   Bluetooth headphones and speakers keep music (A2DP) again. `bt-headset-hid wireplumber`
-  keeps the headset set up before and takes `-headset` to change it.
+  keeps the headsets set up before and takes `-headset` to change them.
+- pipewire mode: several headsets, e.g. one for the office and one for home:
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. The `bt-headset-hid` speaker and microphone
+  use whichever of them is connected.
 
 ## 0.2.0
 

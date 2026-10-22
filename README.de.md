@@ -86,7 +86,7 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    Softphones das Gerät öffnen dürfen, den systemd-Dienst mit dem gewählten Modus, bei `pipewire`
    die D-Bus-Policy und das Abschalten von ModemManager, und die WirePlumber-Konfiguration deines
    Benutzers (0.4 oder 0.5, wird automatisch erkannt). Bei `-mode pipewire` legt er ausserdem
-   einen Lautsprecher und ein Mikrofon namens `bt-headset-hid` für das gekoppelte Headset an. Zum Moduswechsel einfach erneut ausführen;
+   einen Lautsprecher und ein Mikrofon namens `bt-headset-hid` für das gekoppelte Headset an (mehrere Headsets: siehe `-headset` unten). Zum Moduswechsel einfach erneut ausführen;
    `sudo bt-headset-hid uninstall` entfernt alles wieder.
 
 3. **Headset verbinden** wie gewohnt (`bluetoothctl` oder über den Desktop; war es schon
@@ -112,11 +112,13 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   `~/.config/wireplumber/bluetooth.lua.d/`, ab 0.5: `~/.config/wireplumber/wireplumber.conf.d/`),
   entfernt die Datei der jeweils anderen Version und startet PipeWire neu; `-remove` macht es
   rückgängig. Von Hand: die passende Datei aus `contrib/wireplumber/` an den Pfad kopieren, der in
-  ihren ersten Zeilen steht. Bei `-mode pipewire` richtet es ausserdem ein Headset ein: Eine
-  WirePlumber-Regel (`52-bt-headset-hid-headset.lua` bzw. `.conf`) startet es im Telefonprofil,
+  ihren ersten Zeilen steht. Bei `-mode pipewire` richtet es ausserdem die Headsets ein: Eine
+  WirePlumber-Regel (`52-bt-headset-hid-headset.lua` bzw. `.conf`) startet sie im Telefonprofil,
   und `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` legt Lautsprecher und Mikrofon
-  `bt-headset-hid` dafür an. Es nimmt das bisher eingerichtete Headset, sonst das gekoppelte; bei
-  mehreren oder zum Wechseln: `-headset XX:XX:XX:XX:XX:XX`.
+  `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, das erste, das
+  PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
+  einzurichten, etwa eines fürs Büro und eines für zu Hause, oder zum Wechseln:
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`.
 - Nur für `-mode pipewire`: `sudo systemctl disable --now ModemManager` (Mobilfunkmodems gehen
   nicht, solange bt-headset-hid läuft) und
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire muss mit
