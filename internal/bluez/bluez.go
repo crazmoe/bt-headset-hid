@@ -1,7 +1,8 @@
 // Package bluez registers the HFP and HSP Audio Gateway profiles with BlueZ
 // (org.bluez.ProfileManager1) and hands out the RFCOMM sockets of connecting
-// headsets. It is only needed in the mode without audio, where this daemon
-// instead of PipeWire talks HFP to the headset.
+// headsets, which is only needed in the mode without audio, where this daemon
+// instead of PipeWire talks HFP to the headset. Headsets lists the paired
+// headsets for the PipeWire configuration.
 package bluez
 
 import (

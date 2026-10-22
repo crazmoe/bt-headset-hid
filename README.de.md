@@ -18,7 +18,8 @@ belegen. Deshalb wählst du:
 | | `-mode pipewire` (Standard) | `-mode hfp` |
 |---|---|---|
 | Wer belegt HFP | PipeWire | bt-headset-hid |
-| Telefon-Audio (Headset-Mikrofon und -Lautsprecher) | ja | nein (nur A2DP-Musik) |
+| Telefon-Audio (Headset-Mikrofon und -Lautsprecher) | ja, als Lautsprecher und Mikrofon „bt-headset-hid“ | nein (nur A2DP-Musik) |
+| Musik über das Headset | Telefonqualität (kein A2DP, das Headset bleibt anrufbereit) | A2DP |
 | Annehmen / Auflegen / Ablehnen | ja | ja |
 | Wahlwiederholung, Lautstärketasten, HSP-Taste | nein | ja |
 | Anruftaste ausserhalb eines Anrufs, falls das Headset sie als AVRCP Play/Pause schickt | an den Medienplayer (`-grab-media-keys`: ans Softphone) | ans Softphone |
@@ -70,15 +71,20 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    alles ein: das Programm in `/usr/local/bin`, das Kernelmodul `uhid`, die udev-Regel, damit
    Softphones das Gerät öffnen dürfen, den systemd-Dienst mit dem gewählten Modus, bei `pipewire`
    die D-Bus-Policy und das Abschalten von ModemManager, und die WirePlumber-Konfiguration deines
-   Benutzers (0.4 oder 0.5, wird automatisch erkannt). Zum Moduswechsel einfach erneut ausführen;
+   Benutzers (0.4 oder 0.5, wird automatisch erkannt). Bei `-mode pipewire` legt er ausserdem
+   einen Lautsprecher und ein Mikrofon namens `bt-headset-hid` für das gekoppelte Headset an. Zum Moduswechsel einfach erneut ausführen;
    `sudo bt-headset-hid uninstall` entfernt alles wieder.
 
 3. **Headset verbinden** wie gewohnt (`bluetoothctl` oder über den Desktop; war es schon
    verbunden, neu verbinden) und in `journalctl -u bt-headset-hid -f` auf „headset … connected“
-   achten. Bei `-mode pipewire` für Anrufe das Profil „Headset Head Unit (HSP/HFP)“ wählen oder
-   WirePlumber automatisch umschalten lassen, wenn das Softphone das Mikrofon öffnet.
+   achten. Bei `-mode pipewire` bietet das Headset nur das Telefonprofil (HFP) an und ist so
+   immer anrufbereit. Hast du es erst nach `install` gekoppelt, einmal
+   `bt-headset-hid wireplumber` als normaler Benutzer ausführen, damit Lautsprecher und Mikrofon
+   `bt-headset-hid` darauf zeigen.
 
-4. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Browser-Apps fragen einmal nach
+4. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Bei `-mode pipewire` auch als
+   Lautsprecher und Mikrofon `bt-headset-hid` wählen: Die gibt es immer, sie leiten den Ton zum
+   Headset, solange es verbunden ist, sonst zu den Standardgeräten. Browser-Apps fragen einmal nach
    dem WebHID-Zugriff.
 
 ### Einrichtung von Hand
@@ -91,7 +97,10 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   `~/.config/wireplumber/bluetooth.lua.d/`, ab 0.5: `~/.config/wireplumber/wireplumber.conf.d/`),
   entfernt die Datei der jeweils anderen Version und startet PipeWire neu; `-remove` macht es
   rückgängig. Von Hand: die passende Datei aus `contrib/wireplumber/` an den Pfad kopieren, der in
-  ihren ersten Zeilen steht.
+  ihren ersten Zeilen steht. Bei `-mode pipewire` schreibt es ausserdem
+  `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` mit Lautsprecher und Mikrofon
+  `bt-headset-hid` für das gekoppelte Headset (bei mehreren Headsets:
+  `-headset XX:XX:XX:XX:XX:XX`).
 - Nur für `-mode pipewire`: `sudo systemctl disable --now ModemManager` (Mobilfunkmodems gehen
   nicht, solange bt-headset-hid läuft) und
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire muss mit
@@ -134,9 +143,10 @@ sobald es den Hook Switch sieht.
   ankommt. Wenn ja, übernimmt `-grab-media-keys` dieses Gerät exklusiv, Play/Pause wird so zur
   Anruftaste (im Journal steht `media keys of "<Headset> (AVRCP)" now go to the softphone`), und
   Vor/Zurück steuern vom Headset aus keine Musik mehr.
-- Kein Ton im Gespräch bei `-mode pipewire`: Das Softphone muss das Headset als Lautsprecher und
-  Mikrofon verwenden (in seinen Einstellungen oder als Standardgerät), sonst öffnet PipeWire keinen
-  Gesprächston zum Headset, und es fällt womöglich in den Musikmodus zurück.
+- Kein Ton im Gespräch bei `-mode pipewire`: Das Softphone muss `bt-headset-hid` (oder das
+  Headset) als Lautsprecher und Mikrofon verwenden, sonst öffnet PipeWire keinen Gesprächston zum
+  Headset. Nach einem Neustart von PipeWire auch das Softphone neu starten. `wpctl status` zeigt
+  während eines Anrufs unter „Streams“, wohin sein Ton geht.
 - Tasten tun nichts bei `-mode pipewire`: prüfen, ob die WirePlumber-Konfiguration aktiv ist
   (`wpctl status`, `journalctl --user -u wireplumber`), und das Headset neu verbinden.
 - `create HID device: open /dev/uhid`: Der Daemon läuft nicht als root, oder das Kernelmodul

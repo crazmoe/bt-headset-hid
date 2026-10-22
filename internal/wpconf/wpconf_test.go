@@ -35,6 +35,8 @@ func TestContent(t *testing.T) {
 	}{
 		{"hfp", Version{0, 4}, `bluez5.headset-roles`},
 		{"pipewire", Version{0, 4}, `["bluez5.hfphsp-backend-native-modem"] = "any"`},
+		{"pipewire", Version{0, 4}, `["bluez5.roles"] = "[ hfp_hf hfp_ag ]"`},
+		{"pipewire", Version{0, 5}, `bluez5.roles = [ hfp_hf hfp_ag ]`},
 		{"hfp", Version{0, 5}, `bluez5.roles = [ a2dp_sink a2dp_source ]`},
 		{"pipewire", Version{0, 5}, `bluez5.hfphsp-backend-native-modem = "any"`},
 	} {
@@ -95,5 +97,40 @@ func TestInstallSwitchesFormat(t *testing.T) {
 	}
 	if removed, err := Remove(dir); err != nil || len(removed) != 0 {
 		t.Fatalf("second Remove = %v, %v", removed, err)
+	}
+}
+
+func TestDevices(t *testing.T) {
+	b, err := DevicesContent("50:c2:75:0d:4e:03")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`target.object = "bluez_output.50_C2_75_0D_4E_03.1"`,
+		`target.object = "bluez_input.50_C2_75_0D_4E_03.0"`,
+		`node.description = "bt-headset-hid"`,
+		`media.class = "Audio/Sink"`,
+		`media.class = "Audio/Source"`,
+	} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("missing %s in\n%s", want, b)
+		}
+	}
+	for _, bad := range []string{"", "50:C2:75:0D:4E", `50:C2:75:0D:4E:0" ]`, "50_C2_75_0D_4E_03"} {
+		if _, err := DevicesContent(bad); err == nil {
+			t.Errorf("DevicesContent(%q) accepted", bad)
+		}
+	}
+
+	dir := t.TempDir()
+	p, err := InstallDevices(dir, "50:C2:75:0D:4E:03")
+	if err != nil || p != filepath.Join(dir, "pipewire", "pipewire.conf.d", "51-bt-headset-hid.conf") {
+		t.Fatalf("InstallDevices = %s, %v", p, err)
+	}
+	if ok, err := RemoveDevices(dir); !ok || err != nil {
+		t.Fatalf("RemoveDevices = %v, %v", ok, err)
+	}
+	if ok, err := RemoveDevices(dir); ok || err != nil {
+		t.Fatalf("second RemoveDevices = %v, %v", ok, err)
 	}
 }

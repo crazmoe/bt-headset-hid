@@ -25,6 +25,14 @@ In mode pipewire, PipeWire's native HFP backend talks to the first ModemManager 
 It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itself as the
 Bluetooth device volume.
 
+In mode pipewire the WirePlumber configuration leaves out A2DP (`bluez5.roles = [ hfp_hf hfp_ag ]`):
+with A2DP, WirePlumber switches the headset to the music profile between calls, and a press on
+the call button then often reaches the media player instead of answering. The PipeWire
+configuration adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting
+`bluez_output.<address>.1` and `bluez_input.<address>.0`. Their side towards the headset is
+passive, so the call audio only runs while a program uses them; without the headset WirePlumber
+connects them to the default devices.
+
 Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
 passes an Active that follows Idle on to the modem only after one second, and drops it when
 another state comes first, so the headset does not see a call that ends at once.
@@ -48,7 +56,7 @@ PipeWire is dropped, in case the headset reported it both ways.
 | `modem` | ModemManager modem for PipeWire: call state logic (`Calls`, pure) and its D-Bus export (`Server`) | D-Bus |
 | `bluez` | Register HFP AG / HSP AG profiles via D-Bus, receive RFCOMM fds (mode hfp) | D-Bus |
 | `daemon` | Wire everything together: `Bridge` (mapping + HID device), `Session` (one headset in mode hfp), `Run` | all |
-| `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON | files |
+| `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON; in mode pipewire also the PipeWire loopbacks for the `bt-headset-hid` speaker and microphone | files |
 | `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner | files, commands |
 | `dbustest` | Private `dbus-daemon` for tests | process |
 
