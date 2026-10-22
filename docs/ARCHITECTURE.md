@@ -25,9 +25,11 @@ In mode pipewire, PipeWire's native HFP backend talks to the first ModemManager 
 It forwards only `ATA` and `AT+CHUP`, refuses dialing, and handles `AT+VGS` itself as the
 Bluetooth device volume.
 
-In mode pipewire the WirePlumber configuration leaves out A2DP (`bluez5.roles = [ hfp_hf hfp_ag ]`):
-with A2DP, WirePlumber switches the headset to the music profile between calls, and a press on
-the call button then often reaches the media player instead of answering. The PipeWire
+In mode pipewire a WirePlumber rule for the one headset (`device.name = bluez_card.<address>`)
+sets `device.profile = headset-head-unit`, so it starts in the phone profile while other
+Bluetooth devices keep A2DP. Otherwise WirePlumber puts the headset into the music profile
+between calls, and a press on the call button then often reaches the media player instead of
+answering. A profile the user picks by hand is stored by WirePlumber and still wins. The PipeWire
 configuration adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting
 `bluez_output.<address>.1` and `bluez_input.<address>.0`. Their side towards the headset is
 passive, so the call audio only runs while a program uses them; without the headset WirePlumber

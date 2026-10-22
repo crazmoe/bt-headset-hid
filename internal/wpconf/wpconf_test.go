@@ -35,8 +35,6 @@ func TestContent(t *testing.T) {
 	}{
 		{"hfp", Version{0, 4}, `bluez5.headset-roles`},
 		{"pipewire", Version{0, 4}, `["bluez5.hfphsp-backend-native-modem"] = "any"`},
-		{"pipewire", Version{0, 4}, `["bluez5.roles"] = "[ hfp_hf hfp_ag ]"`},
-		{"pipewire", Version{0, 5}, `bluez5.roles = [ hfp_hf hfp_ag ]`},
 		{"hfp", Version{0, 5}, `bluez5.roles = [ a2dp_sink a2dp_source ]`},
 		{"pipewire", Version{0, 5}, `bluez5.hfphsp-backend-native-modem = "any"`},
 	} {
@@ -127,10 +125,48 @@ func TestDevices(t *testing.T) {
 	if err != nil || p != filepath.Join(dir, "pipewire", "pipewire.conf.d", "51-bt-headset-hid.conf") {
 		t.Fatalf("InstallDevices = %s, %v", p, err)
 	}
+	if got := ConfiguredHeadset(dir); got != "50:C2:75:0D:4E:03" {
+		t.Errorf("ConfiguredHeadset = %q", got)
+	}
 	if ok, err := RemoveDevices(dir); !ok || err != nil {
 		t.Fatalf("RemoveDevices = %v, %v", ok, err)
 	}
+	if got := ConfiguredHeadset(dir); got != "" {
+		t.Errorf("ConfiguredHeadset without devices = %q", got)
+	}
 	if ok, err := RemoveDevices(dir); ok || err != nil {
 		t.Fatalf("second RemoveDevices = %v, %v", ok, err)
+	}
+}
+
+func TestHeadset(t *testing.T) {
+	lua, err := HeadsetContent("50:c2:75:0d:4e:03", Version{0, 4})
+	if err != nil || !strings.Contains(string(lua), `{ "device.name", "equals", "bluez_card.50_C2_75_0D_4E_03" }`) ||
+		!strings.Contains(string(lua), `["device.profile"] = "headset-head-unit"`) {
+		t.Errorf("Lua rule %q, %v", lua, err)
+	}
+	conf, err := HeadsetContent("50:C2:75:0D:4E:03", Version{0, 5})
+	if err != nil || !strings.Contains(string(conf), `device.name = "bluez_card.50_C2_75_0D_4E_03"`) ||
+		!strings.Contains(string(conf), `device.profile = "headset-head-unit"`) {
+		t.Errorf("conf rule %q, %v", conf, err)
+	}
+	if _, err := HeadsetContent(`50:C2:75:0D:4E:0" }`, Version{0, 5}); err == nil {
+		t.Error("bad address accepted")
+	}
+
+	dir := t.TempDir()
+	p4, err := InstallHeadset(dir, "50:C2:75:0D:4E:03", Version{0, 4})
+	if err != nil || !strings.HasSuffix(p4, filepath.Join("bluetooth.lua.d", "52-bt-headset-hid-headset.lua")) {
+		t.Fatalf("InstallHeadset 0.4 = %s, %v", p4, err)
+	}
+	p5, err := InstallHeadset(dir, "50:C2:75:0D:4E:03", Version{0, 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(p4); !os.IsNotExist(err) {
+		t.Errorf("Lua rule still there after the switch to 0.5: %v", err)
+	}
+	if removed, err := RemoveHeadset(dir); err != nil || len(removed) != 1 || removed[0] != p5 {
+		t.Fatalf("RemoveHeadset = %v, %v", removed, err)
 	}
 }

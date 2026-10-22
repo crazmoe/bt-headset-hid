@@ -18,6 +18,10 @@ func DevicesPath(dir string) string {
 
 var addressRE = regexp.MustCompile(`^([0-9A-F]{2}:){5}[0-9A-F]{2}$`)
 
+func errNotAddress(addr string) error {
+	return fmt.Errorf("wpconf: %q is not a Bluetooth address", addr)
+}
+
 // DevicesContent returns the PipeWire configuration for a speaker and a
 // microphone named "bt-headset-hid" that always exist and pass the sound to
 // and from the headset with Bluetooth address addr while its HFP profile is
@@ -30,7 +34,7 @@ var addressRE = regexp.MustCompile(`^([0-9A-F]{2}:){5}[0-9A-F]{2}$`)
 func DevicesContent(addr string) ([]byte, error) {
 	addr = strings.ToUpper(addr)
 	if !addressRE.MatchString(addr) {
-		return nil, fmt.Errorf("wpconf: %q is not a Bluetooth address", addr)
+		return nil, errNotAddress(addr)
 	}
 	id := strings.ReplaceAll(addr, ":", "_")
 	return []byte(`# bt-headset-hid: fixed speaker and microphone "bt-headset-hid" for the headset ` + addr + `.
@@ -95,4 +99,20 @@ func RemoveDevices(dir string) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
+}
+
+var configuredRE = regexp.MustCompile(`"bluez_output\.((?:[0-9A-F]{2}_){5}[0-9A-F]{2})\.1"`)
+
+// ConfiguredHeadset returns the address of the headset the fixed devices
+// were written for, or "" if there are none.
+func ConfiguredHeadset(dir string) string {
+	data, err := os.ReadFile(DevicesPath(dir))
+	if err != nil {
+		return ""
+	}
+	m := configuredRE.FindSubmatch(data)
+	if m == nil {
+		return ""
+	}
+	return strings.ReplaceAll(string(m[1]), "_", ":")
 }

@@ -41,6 +41,11 @@ func runWirePlumber(args []string) error {
 
 	if *remove {
 		removed, err := wpconf.Remove(dir)
+		if err == nil {
+			var hs []string
+			hs, err = wpconf.RemoveHeadset(dir)
+			removed = append(removed, hs...)
+		}
 		for _, p := range removed {
 			fmt.Println("removed", p)
 		}
@@ -71,7 +76,7 @@ func runWirePlumber(args []string) error {
 			return err
 		}
 		fmt.Printf("WirePlumber %d.%d: wrote %s for -mode %s\n", v.Major, v.Minor, path, *mode)
-		if err := setupDevices(dir, *mode, *headset); err != nil {
+		if err := setupHeadset(dir, *mode, *headset, v); err != nil {
 			return err
 		}
 	}
@@ -88,28 +93,48 @@ func runWirePlumber(args []string) error {
 	return nil
 }
 
-// setupDevices writes the fixed "bt-headset-hid" speaker and microphone for
-// the headset in mode pipewire and removes them in mode hfp, where PipeWire
-// has no call audio.
-func setupDevices(dir, mode, addr string) error {
+// setupHeadset sets up the headset in mode pipewire: it starts in the phone
+// profile, while other Bluetooth devices keep A2DP, and gets the fixed
+// "bt-headset-hid" speaker and microphone. Mode hfp, where PipeWire has no
+// call audio, removes both.
+func setupHeadset(dir, mode, addr string, v wpconf.Version) error {
 	if mode != "pipewire" {
-		if ok, err := wpconf.RemoveDevices(dir); err != nil || !ok {
+		removed, err := wpconf.RemoveHeadset(dir)
+		if err != nil {
 			return err
 		}
-		fmt.Println("removed", wpconf.DevicesPath(dir))
+		ok, err := wpconf.RemoveDevices(dir)
+		if err != nil {
+			return err
+		}
+		if ok {
+			removed = append(removed, wpconf.DevicesPath(dir))
+		}
+		for _, p := range removed {
+			fmt.Println("removed", p)
+		}
 		return nil
 	}
 	name := addr
 	if addr == "" {
+		addr = wpconf.ConfiguredHeadset(dir)
+		name = addr + " (as before; another headset: -headset XX:XX:XX:XX:XX:XX)"
+	}
+	if addr == "" {
 		h, err := findHeadset()
 		if err != nil {
-			fmt.Printf("no speaker and microphone \"bt-headset-hid\": %v\n", err)
+			fmt.Printf("no phone profile and no speaker and microphone \"bt-headset-hid\": %v\n", err)
 			fmt.Println("  pair the headset, then run this again, or pass -headset XX:XX:XX:XX:XX:XX")
 			return nil
 		}
 		addr, name = h.Address, fmt.Sprintf("%s (%s)", h.Name, h.Address)
 	}
-	path, err := wpconf.InstallDevices(dir, addr)
+	path, err := wpconf.InstallHeadset(dir, addr, v)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("wrote %s: %s starts in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
+	path, err = wpconf.InstallDevices(dir, addr)
 	if err != nil {
 		return err
 	}
