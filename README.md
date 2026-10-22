@@ -18,7 +18,8 @@ HFP. So you choose:
 | | `-mode pipewire` (default) | `-mode hfp` |
 |---|---|---|
 | Who owns HFP | PipeWire | bt-headset-hid |
-| Call audio (headset mic and speaker) | yes | no (A2DP music only) |
+| Call audio (headset mic and speaker) | yes, as speaker and microphone "bt-headset-hid" | no (A2DP music only) |
+| Music over the headset | phone quality (no A2DP, the headset stays ready for calls) | A2DP |
 | Answer / hang up / reject | yes | yes |
 | Redial, volume keys, HSP button | no | yes |
 | Call button outside a call, if the headset sends it as AVRCP play/pause | to the media player (`-grab-media-keys`: to the softphone) | to the softphone |
@@ -69,15 +70,19 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    the program in `/usr/local/bin`, the `uhid` kernel module, the udev rule that lets softphones
    open the device, the systemd service with the chosen mode, for `pipewire` the D-Bus policy and
    switching off ModemManager, and the WirePlumber configuration of your user (0.4 or 0.5,
-   detected automatically). Run it again to switch modes; `sudo bt-headset-hid uninstall`
+   detected automatically). In `-mode pipewire` it also creates a speaker and a microphone named
+   `bt-headset-hid` for the paired headset. Run it again to switch modes; `sudo bt-headset-hid uninstall`
    removes everything.
 
 3. **Connect the headset** as usual (`bluetoothctl` or your desktop; reconnect it if it was
    already connected) and watch `journalctl -u bt-headset-hid -f` for "headset … connected".
-   In `-mode pipewire` pick the headset's "Headset Head Unit (HSP/HFP)" profile for calls, or let
-   WirePlumber switch automatically when the softphone opens the microphone.
+   In `-mode pipewire` the headset only offers the phone profile (HFP), so it is always ready
+   for calls. If you paired it only after `install`, run `bt-headset-hid wireplumber` once as
+   your user so the `bt-headset-hid` speaker and microphone point to it.
 
-4. **Select the device in the softphone.** It is called `bt-headset-hid`. Browser apps ask for
+4. **Select the device in the softphone.** It is called `bt-headset-hid`. In `-mode pipewire`
+   also choose `bt-headset-hid` as speaker and microphone: these always exist, pass the sound to
+   the headset while it is connected and to the default devices otherwise. Browser apps ask for
    WebHID access once.
 
 ### Manual setup
@@ -90,6 +95,9 @@ What `install` does, step by step, if you prefer to do it yourself:
   `~/.config/wireplumber/bluetooth.lua.d/`, 0.5 and later: `~/.config/wireplumber/wireplumber.conf.d/`),
   removes the file of the other version and restarts PipeWire; `-remove` undoes it. By hand: copy
   the matching file from `contrib/wireplumber/` to the path written in its first lines.
+  In `-mode pipewire` it also writes `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf`
+  with the `bt-headset-hid` speaker and microphone for the paired headset (several headsets:
+  `-headset XX:XX:XX:XX:XX:XX`).
 - Only for `-mode pipewire`: `sudo systemctl disable --now ModemManager` (mobile broadband modems
   stop working while bt-headset-hid runs) and
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire must be built with
@@ -132,9 +140,10 @@ when it sees the hook switch.
   there. If it does, `-grab-media-keys` takes that device exclusively, so play/pause becomes the
   call button (the journal shows `media keys of "<headset> (AVRCP)" now go to the softphone`)
   and next/previous no longer control music from the headset.
-- No sound during a call in `-mode pipewire`: the softphone must use the headset as speaker and
-  microphone (in its settings, or as the default device), otherwise PipeWire opens no call audio
-  to the headset and it may drop back to music mode.
+- No sound during a call in `-mode pipewire`: the softphone must use `bt-headset-hid` (or the
+  headset) as speaker and microphone, otherwise PipeWire opens no call audio to the headset.
+  After restarting PipeWire, restart the softphone too. `wpctl status` shows under "Streams"
+  where its sound goes during a call.
 - Buttons do nothing in `-mode pipewire`: check that the WirePlumber configuration is active
   (`wpctl status`, `journalctl --user -u wireplumber`) and restart the headset connection.
 - `create HID device: open /dev/uhid`: the daemon is not running as root, or the `uhid` kernel
