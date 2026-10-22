@@ -21,6 +21,27 @@ type System struct {
 	Session *dbus.Conn
 	// Names are the device.name values of the headsets to switch.
 	Names map[string]bool
+	// Skip are parts of MPRIS names, in lower case, of players never to
+	// pause, such as softphones.
+	Skip []string
+}
+
+// Softphones are parts of the MPRIS names of softphones. Some report their
+// ringtone as playing, and pausing them would silence the call.
+var Softphones = []string{"starclx", "baresip", "linphone", "zoiper", "microsip", "jami", "skype", "teams", "zoom", "jitsi"}
+
+func (s System) skip(name string) bool {
+	// playerctld only mirrors the other players.
+	if name == mprisPrefix+"playerctld" {
+		return true
+	}
+	lower := strings.ToLower(strings.TrimPrefix(name, mprisPrefix))
+	for _, k := range s.Skip {
+		if strings.Contains(lower, k) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s System) Cards() ([]callswitch.Card, error) {
@@ -56,8 +77,7 @@ func (s System) Playing() ([]string, error) {
 	}
 	var playing []string
 	for _, n := range names {
-		// playerctld only mirrors the other players.
-		if !strings.HasPrefix(n, mprisPrefix) || n == mprisPrefix+"playerctld" {
+		if !strings.HasPrefix(n, mprisPrefix) || s.skip(n) {
 			continue
 		}
 		v, err := s.Session.Object(n, mprisPath).GetProperty(mprisPlayer + ".PlaybackStatus")

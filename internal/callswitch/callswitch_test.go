@@ -159,6 +159,19 @@ func TestParseCards(t *testing.T) {
 	if !reflect.DeepEqual(cards, want) {
 		t.Errorf("ParseCards = %+v", cards)
 	}
+	// pw-dump 1.0 may follow up with more arrays: an update and a removal.
+	more := dump + `
+[ { "id": 41, "type": "PipeWire:Interface:Device", "info": { "props": {}, "params": { "Profile": [ { "index": 4, "name": "headset-head-unit" } ] } } } ]
+[ { "id": 42, "info": null } ]`
+	cards, err = ParseCards([]byte(more), map[string]bool{"bluez_card.AC_BF_71_12_34_56": true, "alsa_card.pci-0000_00_1f.3": true})
+	if err != nil || len(cards) != 1 || cards[0].Profile != "headset-head-unit" || cards[0].Profiles["a2dp-sink"] != 1 {
+		t.Errorf("ParseCards of several arrays = %+v, %v", cards, err)
+	}
+	for _, bad := range []string{"not json", "", dump + " x"} {
+		if _, err := ParseCards([]byte(bad), nil); err == nil {
+			t.Errorf("bad dump %q accepted", bad)
+		}
+	}
 	if _, err := ParseCards([]byte("not json"), nil); err == nil {
 		t.Error("bad dump accepted")
 	}

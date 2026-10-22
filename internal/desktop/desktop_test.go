@@ -104,7 +104,9 @@ func (pr props) Get(iface, name string) (dbus.Variant, *dbus.Error) {
 func TestPlayers(t *testing.T) {
 	addr := dbustest.Bus(t)
 	playing, paused := &player{status: "Playing"}, &player{status: "Paused"}
-	for name, p := range map[string]*player{"spotify": playing, "vlc": paused, "playerctld": {status: "Playing"}} {
+	for name, p := range map[string]*player{
+		"spotify": playing, "vlc": paused, "playerctld": {status: "Playing"}, "starclx": {status: "Playing"},
+	} {
 		conn := dbustest.Connect(t, addr)
 		conn.Export(p, mprisPath, mprisPlayer)
 		conn.Export(props{p}, mprisPath, "org.freedesktop.DBus.Properties")
@@ -112,7 +114,7 @@ func TestPlayers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s := System{Session: dbustest.Connect(t, addr)}
+	s := System{Session: dbustest.Connect(t, addr), Skip: Softphones}
 	got, err := s.Playing()
 	if err != nil || len(got) != 1 || got[0] != mprisPrefix+"spotify" {
 		t.Fatalf("Playing = %q, %v", got, err)

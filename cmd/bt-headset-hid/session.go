@@ -66,7 +66,7 @@ func runSession(args []string) error {
 	}
 
 	sw := &callswitch.Switcher{
-		Env:    desktop.System{Session: sess, Names: names},
+		Env:    desktop.System{Session: sess, Names: names, Skip: desktop.Softphones},
 		Log:    logger.Printf,
 		Settle: func() { time.Sleep(2 * time.Second) },
 	}
