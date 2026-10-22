@@ -118,8 +118,9 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   WirePlumber-Regel (`52-bt-headset-hid-headset.lua` bzw. `.conf`) gibt ihrem Telefon-Audio einen
   gemeinsamen Namen, `~/.config/systemd/user/bt-headset-hid-session.service` schaltet sie für
   Gespräche ins Telefonprofil, und `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` legt Lautsprecher und Mikrofon
-  `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, das erste, das
-  PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
+  `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, geht das Gespräch
+  an das, das in den Toneinstellungen als Ausgabe gewählt ist; mit `-profile phone` an das erste,
+  das PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
   einzurichten, etwa eines fürs Büro und eines für zu Hause, oder zum Wechseln:
   `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Mit `-profile phone` bleiben die Headsets
   stattdessen immer im Telefonprofil, ohne den Benutzerdienst (`-profile switch` schaltet zurück).

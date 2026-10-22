@@ -117,8 +117,9 @@ What `install` does, step by step, if you prefer to do it yourself:
   (`52-bt-headset-hid-headset.lua` or `.conf`) gives their call audio one name,
   `~/.config/systemd/user/bt-headset-hid-session.service` switches them to the phone profile for
   calls, and `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` adds the `bt-headset-hid` speaker
-  and microphone, which use whichever of them is connected (with two connected, the first one
-  PipeWire finds). It takes the headsets set up before, otherwise the paired one; to set up
+  and microphone, which use whichever of them is connected (with two connected, the call goes to
+  the one chosen as output in the sound settings; with `-profile phone`, to the first one PipeWire
+  finds). It takes the headsets set up before, otherwise the paired one; to set up
   several, e.g. one for the office and one for home, or to change them:
   `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. With `-profile phone` the headsets stay in the
   phone profile all the time instead, without the user service (`-profile switch` goes back).

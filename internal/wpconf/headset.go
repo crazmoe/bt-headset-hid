@@ -60,7 +60,8 @@ const PhoneMarker = "bt-headset-hid-profile: phone"
 //
 // The rules rename the call audio nodes of all these headsets to
 // HeadsetOutput and HeadsetInput, the targets of the fixed devices. If more
-// than one headset is connected, WirePlumber uses the first it finds.
+// than one of them is in the phone profile, WirePlumber uses the first it
+// finds.
 //
 // With phone, the headsets also start in the phone profile (HFP) instead of
 // A2DP and stay there, which needs no "bt-headset-hid session". Other

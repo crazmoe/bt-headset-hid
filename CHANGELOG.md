@@ -19,7 +19,8 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 - pipewire mode: the headsets play music (A2DP) between calls. For a call the new user service
   `bt-headset-hid-session` pauses media players (MPRIS), switches the headsets to the phone
   profile, and afterwards switches back and resumes them. `-profile phone` keeps them in the
-  phone profile all the time instead.
+  phone profile all the time instead. With two headsets connected, only the one chosen as
+  output in the sound settings switches, so the call goes where the music plays.
 
 ## 0.2.0
 

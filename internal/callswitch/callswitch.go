@@ -20,6 +20,24 @@ type Card struct {
 	Name     string         // device.name, e.g. bluez_card.50_C2_75_0D_4E_03
 	Profile  string         // active profile
 	Profiles map[string]int // available profiles by name, with their index
+	// Default: the default output (sink) of the system is a node of this card.
+	Default bool
+}
+
+// forCall returns the headsets to switch for a call: the one that is the
+// default output if there is one, so with two connected the call goes where
+// the music plays, otherwise all of them.
+func forCall(cards []Card) []Card {
+	var def []Card
+	for _, c := range cards {
+		if c.Default {
+			def = append(def, c)
+		}
+	}
+	if len(def) > 0 {
+		return def
+	}
+	return cards
 }
 
 // IsPhone reports whether profile is a phone profile.
@@ -105,7 +123,7 @@ func (s *Switcher) start() {
 		s.logf("headsets: %v", err)
 	}
 	s.saved = map[string]string{}
-	for _, c := range cards {
+	for _, c := range forCall(cards) {
 		if IsPhone(c.Profile) {
 			continue
 		}

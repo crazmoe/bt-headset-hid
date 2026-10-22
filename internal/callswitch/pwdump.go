@@ -8,13 +8,21 @@ import (
 	"io"
 )
 
-// ParseCards returns the devices named in names from the output of pw-dump.
-// pw-dump (at least 1.0) may print more than one array, later ones updating
-// or removing (info null) objects of earlier ones; they are merged in order.
+// ParseCards returns the devices named in names from the output of pw-dump,
+// and marks the one whose node is the default output (default.audio.sink in
+// the "default" metadata). pw-dump (at least 1.0) may print more than one
+// array, later ones updating or removing (info null) objects of earlier ones;
+// they are merged in order.
 func ParseCards(dump []byte, names map[string]bool) ([]Card, error) {
 	type object struct {
-		ID   uint32 `json:"id"`
-		Type string `json:"type"`
+		ID       uint32         `json:"id"`
+		Type     string         `json:"type"`
+		Props    map[string]any `json:"props"` // of metadata
+		Metadata []struct {
+			Subject uint32          `json:"subject"`
+			Key     string          `json:"key"`
+			Value   json.RawMessage `json:"value"`
+		} `json:"metadata"`
 		Info *struct {
 			Props  map[string]any `json:"props"`
 			Params struct {
@@ -25,6 +33,8 @@ func ParseCards(dump []byte, names map[string]bool) ([]Card, error) {
 	}
 	byID := map[uint32]*Card{}
 	var order []uint32
+	nodeDevice := map[string]uint32{} // node.name -> device.id
+	defaultSink := ""
 	dec := json.NewDecoder(bytes.NewReader(dump))
 	for n := 0; ; n++ {
 		var objs []object
@@ -36,6 +46,22 @@ func ParseCards(dump []byte, names map[string]bool) ([]Card, error) {
 			return nil, fmt.Errorf("pw-dump: %w", err)
 		}
 		for _, o := range objs {
+			if o.Type == "PipeWire:Interface:Metadata" && o.Props["metadata.name"] == "default" {
+				for _, m := range o.Metadata {
+					if m.Subject != 0 || m.Key != "default.audio.sink" {
+						continue
+					}
+					defaultSink = sinkName(m.Value)
+				}
+				continue
+			}
+			if o.Type == "PipeWire:Interface:Node" && o.Info != nil {
+				name, _ := o.Info.Props["node.name"].(string)
+				if dev, ok := o.Info.Props["device.id"].(float64); ok && name != "" {
+					nodeDevice[name] = uint32(dev)
+				}
+				continue
+			}
 			c := byID[o.ID]
 			if o.Info == nil {
 				if o.Type == "" { // removed
@@ -66,8 +92,10 @@ func ParseCards(dump []byte, names map[string]bool) ([]Card, error) {
 		}
 	}
 	var cards []Card
+	defDevice, hasDefault := nodeDevice[defaultSink]
 	for _, id := range order {
 		if c := byID[id]; c != nil && names[c.Name] {
+			c.Default = hasDefault && defDevice == id
 			if c.Profiles == nil {
 				c.Profiles = map[string]int{}
 			}
@@ -81,4 +109,18 @@ func ParseCards(dump []byte, names map[string]bool) ([]Card, error) {
 type profileParam struct {
 	Index int    `json:"index"`
 	Name  string `json:"name"`
+}
+
+// sinkName reads the value of default.audio.sink, {"name": "..."}, which
+// may also come as a string holding that JSON.
+func sinkName(raw json.RawMessage) string {
+	var str string
+	if json.Unmarshal(raw, &str) == nil {
+		raw = json.RawMessage(str)
+	}
+	var v struct{ Name string }
+	if json.Unmarshal(raw, &v) != nil {
+		return ""
+	}
+	return v.Name
 }
