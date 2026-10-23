@@ -77,6 +77,13 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    Deutsch eingestellt ist). Der Benutzerdienst macht dieselben Prüfungen ab und zu selbst und
    meldet jedes neue Problem mit der Lösung als Desktop-Benachrichtigung.
 
+   Der Benutzerdienst zeigt ausserdem ein Symbol im Infobereich auf Desktops mit Infobereich (KDE,
+   Xfce, Cinnamon, MATE, LXQt, waybar; GNOME braucht die AppIndicator-Erweiterung, die Ubuntu
+   mitbringt). Es zeigt, ob ein Headset verbunden ist, einen Anruf, oder ein Warnzeichen, solange
+   `doctor` ein Problem findet. Sein Menü listet die Probleme (ein Klick zeigt die Lösung), die
+   gekoppelten Headsets, bei denen du in den Modi `pipewire` und `ofono` die für Anrufe abhakst (wie
+   mit `-headset`, ohne Neustart), „Jetzt prüfen“ und „Hilfe“.
+
 2. **Ohne Paket**, auf anderen Distributionen, das Tarball nehmen, entpacken und in den Ordner
    wechseln, oder selbst mit Go bauen:
 

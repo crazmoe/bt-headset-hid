@@ -75,6 +75,13 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    runs the same checks now and then and shows a desktop notification for each new problem, with
    the fix.
 
+   The user service also shows a tray icon on desktops with a tray (KDE, Xfce, Cinnamon, MATE,
+   LXQt, waybar; GNOME needs the AppIndicator extension, which Ubuntu has). It shows whether a
+   headset is connected, a call, or a warning sign while `doctor` finds a problem. Its menu
+   lists the problems (click one for the fix), the paired headsets, where in modes `pipewire` and
+   `ofono` you tick the ones for calls (as `-headset` does, without a restart), "Check now" and
+   "Help".
+
 2. **Without the package**, on other distributions, take the tarball, unpack it and change into
    the folder, or build it yourself with Go:
 

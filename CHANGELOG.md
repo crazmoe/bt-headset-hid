@@ -10,6 +10,11 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 
 ## Unreleased
 
+- Tray icon of the user service: shows whether a headset is connected, a call and the problems
+  `doctor` finds (click one for the fix), lets you tick the headsets used for calls, check the
+  setup now and open the help. Desktops with a tray (KDE, Xfce, Cinnamon, MATE, LXQt, waybar;
+  GNOME with the AppIndicator extension, as in Ubuntu) show it. In mode hfp the user service now
+  keeps running for the icon and the checks.
 - The README is now a short guide in three steps for non-technical users; the modes, setup
   without the package or by hand, troubleshooting and development moved to `docs/ADVANCED.md`
   (German: `docs/ADVANCED.de.md`), which the packages and tarballs also ship.

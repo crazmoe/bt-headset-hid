@@ -30,7 +30,9 @@ aktueller Distributionen).
    Audio-Einstellungen) und auch als Lautsprecher und Mikrofon, falls sie in der Liste stehen.
    Browser-Apps fragen einmal nach dem Zugriff auf das Gerät; erlauben.
 
-Fertig: Die Anruftaste am Headset nimmt jetzt ab und legt auf.
+Fertig: Die Anruftaste am Headset nimmt jetzt ab und legt auf. Ein Headset-Symbol im
+Infobereich (obere oder untere Leiste des Desktops) zeigt, ob das Headset verbunden ist; in seinem
+Menü wählst du die Headsets für Anrufe.
 
 ## Etwas geht nicht?
 
@@ -41,7 +43,9 @@ bt-headset-hid doctor
 ```
 
 Das prüft die Einrichtung und nennt zu jedem gefundenen Problem den Befehl, der es behebt.
-Hört etwas auf zu funktionieren, kommt ausserdem eine Desktop-Benachrichtigung mit der Lösung.
+Hört etwas auf zu funktionieren, kommt ausserdem eine Desktop-Benachrichtigung mit der Lösung,
+und das Symbol im Infobereich wird zum Warnzeichen; ein Klick auf das Problem in seinem Menü
+zeigt die Lösung erneut.
 
 Hilft das nicht, bitte ein [Issue](https://github.com/crazmoe/bt-headset-hid/issues/new/choose)
 eröffnen (auf Deutsch oder Englisch) mit Headset-Modell, Distribution und der Ausgabe von

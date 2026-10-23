@@ -29,7 +29,9 @@ current distributions).
    audio settings), and also as speaker and microphone if they are in the list. Browser apps
    ask once for access to the device; allow it.
 
-Done: the call button on the headset now answers and hangs up.
+Done: the call button on the headset now answers and hangs up. A headset icon in the tray (top
+or bottom bar of the desktop) shows whether the headset is connected; its menu chooses the
+headsets for calls.
 
 ## Something does not work?
 
@@ -40,7 +42,8 @@ bt-headset-hid doctor
 ```
 
 It checks the setup and prints the command that fixes each problem it finds. You also get a
-desktop notification when something stops working, with the fix.
+desktop notification when something stops working, with the fix, and the tray icon turns into a
+warning sign; click the problem in its menu to see the fix again.
 
 If that does not help, please open an [issue](https://github.com/crazmoe/bt-headset-hid/issues/new/choose)
 (in English or German) with your headset model, your distribution and the output of
