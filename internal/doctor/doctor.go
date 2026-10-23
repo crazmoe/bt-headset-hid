@@ -304,8 +304,12 @@ func (c *checker) audio(f Facts) {
 			}
 		}
 		if len(gone) > 0 {
+			fix := ""
+			if keep := without(f.Configured, gone); len(keep) > 0 {
+				fix = "bt-headset-hid wireplumber -headset " + strings.Join(keep, ",") + " && sudo systemctl restart bt-headset-hid"
+			}
 			c.add(Info, "eingerichtet, aber nicht mehr gekoppelt: "+strings.Join(gone, ", "),
-				"set up but no longer paired: "+strings.Join(gone, ", "), "")
+				"set up but no longer paired: "+strings.Join(gone, ", "), fix)
 		}
 		c.add(OK, "Headsets für Gesprächston: "+strings.Join(f.Configured, ", "),
 			"headsets for call audio: "+strings.Join(f.Configured, ", "), "")
@@ -367,4 +371,21 @@ func LastStart(lines []string) []string {
 		}
 	}
 	return lines
+}
+
+// without returns the addresses of all that are not in drop.
+func without(all, drop []string) []string {
+	var keep []string
+	for _, a := range all {
+		found := false
+		for _, d := range drop {
+			if strings.EqualFold(a, d) {
+				found = true
+			}
+		}
+		if !found {
+			keep = append(keep, a)
+		}
+	}
+	return keep
 }

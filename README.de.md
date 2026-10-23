@@ -149,8 +149,10 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   Headsets, sonst das gekoppelte, und fragt nach, wenn mehrere gekoppelt sind (ohne Terminal nimmt
   es die verbundenen, sonst alle); um mehrere einzurichten, etwa eines fürs Büro und eines für zu
   Hause, oder zum Wechseln: `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Die in dem Moment
-  gekoppelten Headsets merkt es sich in `~/.config/bt-headset-hid/known-headsets`; später
-  gekoppelte stehen nicht darauf, und der Benutzerdienst richtet sie von selbst ein. Ausserdem schaltet es WirePlumbers eigenen
+  gekoppelten Headsets und die, die du mit `-headset` weglässt, merkt es sich in
+  `~/.config/bt-headset-hid/known-headsets`; sie werden auch nach erneutem Koppeln nicht wieder
+  eingerichtet. Ein Headset, das später zum ersten Mal gekoppelt wird, steht nicht darauf, und der
+  Benutzerdienst richtet es von selbst ein. Ausserdem schaltet es WirePlumbers eigenen
   Wechsel ins Telefonprofil ab (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), der bei einem
   Gespräch jedes Bluetooth-Headset umschalten würde. Mit `-profile phone` bleiben die Headsets
   stattdessen immer im Telefonprofil; der Benutzerdienst richtet dann nur neu gekoppelte Headsets

@@ -173,7 +173,8 @@ func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, erro
 	}
 	paired, pairedErr := pairedHeadsets()
 	name := strings.Join(addrs, ", ")
-	if dropped := droppedHeadsets(wpconf.ConfiguredHeadsets(dir), addrs); len(addrs) > 0 && len(dropped) > 0 {
+	dropped := droppedHeadsets(wpconf.ConfiguredHeadsets(dir), addrs)
+	if len(addrs) > 0 && len(dropped) > 0 {
 		fmt.Printf("no longer set up: %s; to keep them too: -headset %s\n",
 			strings.Join(dropped, ", "), strings.Join(append(addrs, dropped...), ","))
 	}
@@ -199,11 +200,13 @@ func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, erro
 			name = strings.Join(names, ", ")
 		}
 	}
-	// Headsets paired now and not chosen stay as they are; ones paired
-	// later are set up by "bt-headset-hid session".
+	// Headsets paired now and not chosen, and ones dropped, stay as they
+	// are, even when paired again; ones paired later for the first time are
+	// set up by "bt-headset-hid session".
 	known, _ := wpconf.Known(dir)
-	if pairedErr == nil {
-		known = addresses(paired)
+	known = append(known, addresses(paired)...)
+	if len(addrs) > 0 {
+		known = append(known, dropped...)
 	}
 	if err := wpconf.SetKnown(dir, append(known, addrs...)); err != nil {
 		return false, err

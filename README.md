@@ -145,9 +145,10 @@ What `install` does, step by step, if you prefer to do it yourself:
   the first one PipeWire finds). It takes the headsets set up before, otherwise the paired one,
   and asks if several are paired (without a terminal it takes the connected ones, or all); to set up
   several, e.g. one for the office and one for home, or to change them:
-  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. It notes the headsets paired at that moment in
-  `~/.config/bt-headset-hid/known-headsets`; ones paired later are not on that list, and the user
-  service sets them up by itself. It also turns off WirePlumber's own switch to the
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. It notes the headsets paired at that moment, and
+  the ones you leave out with `-headset`, in `~/.config/bt-headset-hid/known-headsets`; these are
+  not set up again even when paired again. A headset paired later for the first time is not on
+  that list, and the user service sets it up by itself. It also turns off WirePlumber's own switch to the
   phone profile (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), which would switch every
   Bluetooth headset when a call starts. With `-profile phone` the headsets stay in the
   phone profile all the time instead; the user service then only sets up newly paired headsets
