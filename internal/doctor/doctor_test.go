@@ -109,6 +109,11 @@ func TestWarnings(t *testing.T) {
 		}
 	}
 	f = healthy()
+	f.OldRules = true
+	if got := Check(f, false); !hasLevel(got, Warn, "rules for every headset") {
+		t.Errorf("old rules: %+v", got)
+	}
+	f = healthy()
 	f.Root = true
 	if got := Check(f, false); !hasLevel(got, Info, "Started as root") {
 		t.Errorf("root: %+v", got)

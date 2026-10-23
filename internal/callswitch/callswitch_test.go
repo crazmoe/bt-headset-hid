@@ -156,10 +156,10 @@ func TestSwitcherSetFails(t *testing.T) {
 
 func TestPhoneProfile(t *testing.T) {
 	c := Card{Profiles: map[string]int{"a2dp-sink": 1, "headset-head-unit-msbc": 3, "headset-head-unit-cvsd": 2}}
-	if got := c.phoneProfile(); got != "headset-head-unit-cvsd" {
+	if got := c.PhoneProfile(); got != "headset-head-unit-cvsd" {
 		t.Errorf("phoneProfile = %q", got)
 	}
-	if got := (Card{Profiles: map[string]int{"a2dp-sink": 1}}).phoneProfile(); got != "" {
+	if got := (Card{Profiles: map[string]int{"a2dp-sink": 1}}).PhoneProfile(); got != "" {
 		t.Errorf("phoneProfile without HFP = %q", got)
 	}
 }

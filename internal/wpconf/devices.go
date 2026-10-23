@@ -23,14 +23,15 @@ func errNotAddress(addr string) error {
 
 // DevicesContent returns the PipeWire configuration for a speaker and a
 // microphone named "bt-headset-hid" that always exist and pass the sound to
-// and from the call audio of the connected bt-headset-hid headset
-// (HeadsetOutput and HeadsetInput, named by the headset rules). Softphones
-// can then keep "bt-headset-hid" selected for the HID device, the speaker and
-// the microphone.
+// and from the call audio of the connected bt-headset-hid headset.
+// Softphones can then keep "bt-headset-hid" selected for the HID device, the
+// speaker and the microphone.
 //
 // Both are loopbacks whose side towards the headset is passive, so the call
-// audio (SCO) to the headset only runs while a program uses them. While no
-// headset is connected, WirePlumber connects them to the default devices.
+// audio (SCO) to the headset only runs while a program uses them.
+// "bt-headset-hid session" points that side at the headset (target.object in
+// the metadata); without one, WirePlumber connects them to the default
+// devices.
 func DevicesContent() []byte {
 	return []byte(`# bt-headset-hid: fixed speaker and microphone "bt-headset-hid" for the connected headset.
 # ~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf, written by "bt-headset-hid wireplumber".
@@ -45,7 +46,6 @@ context.modules = [
       }
       playback.props = {
         node.name = "bt-headset-hid.speaker.out"
-        target.object = "` + HeadsetOutput + `"
         audio.position = [ MONO ]
         stream.dont-remix = true
         node.passive = true
@@ -57,7 +57,6 @@ context.modules = [
       node.description = "bt-headset-hid"
       capture.props = {
         node.name = "bt-headset-hid.microphone.in"
-        target.object = "` + HeadsetInput + `"
         audio.position = [ MONO ]
         stream.dont-remix = true
         node.passive = true

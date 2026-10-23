@@ -149,6 +149,7 @@ func gatherFacts() doctor.Facts {
 	if dir, err := os.UserConfigDir(); err == nil {
 		f.WPMode = wpconf.ConfiguredMode(dir)
 		f.Configured = wpconf.ConfiguredHeadsets(dir)
+		f.OldRules = wpconf.OldRules(dir)
 	}
 	return f
 }

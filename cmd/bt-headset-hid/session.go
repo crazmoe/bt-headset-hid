@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -29,6 +28,10 @@ const endDelay = 2 * time.Second
 // is set up.
 const adoptDelay = 3 * time.Second
 
+// routeDelay is how long PipeWire's objects must be quiet before the speaker
+// and microphone "bt-headset-hid" are pointed at the headset again.
+const routeDelay = 300 * time.Millisecond
+
 // runSession implements "bt-headset-hid session", which runs in the user's
 // session in modes pipewire and ofono: during a call it pauses the media players and
 // switches the headsets set up with "bt-headset-hid wireplumber" from music
@@ -49,9 +52,16 @@ func runSession(args []string) error {
 	}
 	addrs := wpconf.ConfiguredHeadsets(dir)
 	names := map[string]bool{}
-	for _, a := range addrs {
-		names[cardName(a)] = true
+	setAddrs := func(as []string) {
+		addrs = as
+		for n := range names {
+			delete(names, n)
+		}
+		for _, a := range as {
+			names[cardName(a)] = true
+		}
 	}
+	setAddrs(addrs)
 	sys, err := dbus.ConnectSystemBus()
 	if err != nil {
 		return err
@@ -77,7 +87,7 @@ func runSession(args []string) error {
 		Settle: func() { time.Sleep(2 * time.Second) },
 	}
 	// With -profile phone the headsets stay in the phone profile, and this
-	// only sets up headsets paired later.
+	// does not switch them for calls.
 	phone := wpconf.ConfiguredPhone(dir)
 	switch {
 	case len(addrs) == 0:
@@ -90,15 +100,36 @@ func runSession(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// The speaker and microphone "bt-headset-hid" follow the headset
+	// connected, checked a moment after PipeWire's objects changed.
+	pwChanged := make(chan struct{}, 1)
+	go desktop.Monitor(ctx, pwChanged, logger.Printf)
+	var routeAt <-chan time.Time
+	routeSoon := func() {
+		if routeAt == nil {
+			routeAt = time.After(routeDelay)
+		}
+	}
+
 	var end <-chan time.Time
 	taken := "" // headset that took the call, if known
 	check := func(final bool) {
-		if phone {
-			return
-		}
 		in, route, err := desktop.InCall(sys)
 		if err != nil {
 			logger.Printf("call state: %v", err)
+			return
+		}
+		if !in {
+			route = callswitch.Route{}
+		}
+		if route.Device != taken {
+			if route.Device != "" {
+				logger.Printf("call taken on %s", route.Device)
+			}
+			taken = route.Device
+			routeSoon()
+		}
+		if phone {
 			return
 		}
 		switch {
@@ -107,10 +138,6 @@ func runSession(args []string) error {
 			if !sw.InCall() {
 				logger.Print("call")
 			}
-			if route.Device != "" && route.Device != taken {
-				logger.Printf("call taken on %s", route.Device)
-			}
-			taken = route.Device
 			sw.Call(true, route)
 		case !sw.InCall():
 		case final:
@@ -121,16 +148,20 @@ func runSession(args []string) error {
 		}
 	}
 	// Newly paired headsets are set up a moment after the last change in
-	// BlueZ, once their profiles are known, and not during a call, since
-	// that restarts PipeWire and WirePlumber.
+	// BlueZ, once their profiles are known.
 	var adopt <-chan time.Time
 	adoptPending := true
 	check(false)
 	for {
-		if adoptPending && !sw.InCall() && adopt == nil {
+		if adoptPending && adopt == nil {
 			adopt = time.After(adoptDelay)
 		}
 		select {
+		case <-pwChanged:
+			routeSoon()
+		case <-routeAt:
+			routeAt = nil
+			routeAudio(addrs, taken, phone, sw.Env, logger)
 		case <-ctx.Done():
 			sw.Call(false, callswitch.Route{})
 			return nil
@@ -142,8 +173,9 @@ func runSession(args []string) error {
 			if dev, ok := unpaired(sig); ok {
 				// A device of an adapter that went away is not unpaired.
 				if _, err := bluez.LocalAddress(sys, dev); err == nil {
-					if a := dropHeadset(dir, bluez.AddressFromPath(dev), logger); a != "" {
-						delete(names, cardName(a))
+					if dropHeadset(dir, bluez.AddressFromPath(dev), logger) != "" {
+						setAddrs(wpconf.ConfiguredHeadsets(dir))
+						routeSoon()
 					}
 				}
 				continue
@@ -158,12 +190,10 @@ func runSession(args []string) error {
 			check(true)
 		case <-adopt:
 			adopt = nil
-			if sw.InCall() {
-				continue
-			}
 			adoptPending = false
-			for _, a := range adoptHeadsets(sys, dir, logger) {
-				names[cardName(a)] = true
+			if len(adoptHeadsets(sys, dir, logger)) > 0 {
+				setAddrs(wpconf.ConfiguredHeadsets(dir))
+				routeSoon()
 			}
 		}
 	}
@@ -228,9 +258,9 @@ func pairingChanged(sig *dbus.Signal) bool {
 	return false
 }
 
-// adoptHeadsets sets up the headsets paired since the headsets were last set
-// up, restarts PipeWire and WirePlumber for them and returns them. Without a list of the
-// headsets known before, from an older version, it only writes that list.
+// adoptHeadsets adds the headsets paired since the headsets were last set up
+// to the headset list and returns them. Without a list of the headsets known
+// before, from an older version, it only writes that list.
 func adoptHeadsets(sys *dbus.Conn, dir string, logger *log.Logger) []string {
 	hs, err := bluez.Headsets(sys)
 	if err != nil {
@@ -250,12 +280,7 @@ func adoptHeadsets(sys *dbus.Conn, dir string, logger *log.Logger) []string {
 	if len(add) == 0 {
 		return nil
 	}
-	v, err := wireplumberVersion()
-	if err != nil {
-		logger.Printf("set up %s: %v", strings.Join(add, ", "), err)
-		return nil
-	}
-	if _, err := wpconf.InstallHeadset(dir, append(configured, add...), v, wpconf.ConfiguredPhone(dir)); err != nil {
+	if err := wpconf.SetHeadsets(dir, append(configured, add...), wpconf.ConfiguredPhone(dir)); err != nil {
 		logger.Printf("set up %s: %v", strings.Join(add, ", "), err)
 		return nil
 	}
@@ -264,9 +289,6 @@ func adoptHeadsets(sys *dbus.Conn, dir string, logger *log.Logger) []string {
 	}
 	logger.Printf("newly paired headset %s set up; to undo: bt-headset-hid wireplumber -headset %s",
 		strings.Join(add, ", "), strings.Join(configured, ","))
-	if err := restartPipeWire(); err != nil {
-		logger.Print(err)
-	}
 	return add
 }
 
@@ -286,10 +308,9 @@ func unpaired(sig *dbus.Signal) (dbus.ObjectPath, bool) {
 	return "", false
 }
 
-// dropHeadset takes the unpaired headset addr out of the headset rules and
+// dropHeadset takes the unpaired headset addr off the headset list and
 // returns it, or "" if it was not set up. It stays on the known list, so
-// pairing it again does not set it up again. WirePlumber needs no restart:
-// a rule for a headset that is not there does nothing.
+// pairing it again does not set it up again.
 func dropHeadset(dir, addr string, logger *log.Logger) string {
 	configured := wpconf.ConfiguredHeadsets(dir)
 	keep := droppedHeadsets(configured, []string{addr})
@@ -300,16 +321,7 @@ func dropHeadset(dir, addr string, logger *log.Logger) string {
 	if err := wpconf.SetKnown(dir, append(known, addr)); err != nil {
 		logger.Printf("known headsets: %v", err)
 	}
-	var err error
-	if len(keep) == 0 {
-		_, err = wpconf.RemoveHeadset(dir)
-	} else {
-		var v wpconf.Version
-		if v, err = wireplumberVersion(); err == nil {
-			_, err = wpconf.InstallHeadset(dir, keep, v, wpconf.ConfiguredPhone(dir))
-		}
-	}
-	if err != nil {
+	if err := wpconf.SetHeadsets(dir, keep, wpconf.ConfiguredPhone(dir)); err != nil {
 		logger.Printf("unpaired headset %s: %v", addr, err)
 		return ""
 	}
@@ -317,11 +329,41 @@ func dropHeadset(dir, addr string, logger *log.Logger) string {
 	return addr
 }
 
-// wireplumberVersion asks the installed WirePlumber for its version.
-func wireplumberVersion() (wpconf.Version, error) {
-	out, err := exec.Command("wireplumber", "--version").CombinedOutput()
-	if err != nil {
-		return wpconf.Version{}, fmt.Errorf("wireplumber --version: %v", err)
+// routeAudio points the speaker and microphone "bt-headset-hid" at the call
+// audio of the headset in addrs that is connected, preferring device, the
+// one that took the call, and with phone keeps the connected headsets in the
+// phone profile.
+func routeAudio(addrs []string, device string, phone bool, env callswitch.Env, logger *log.Logger) {
+	if phone {
+		cards, err := env.Cards()
+		if err != nil {
+			logger.Printf("headsets: %v", err)
+		}
+		for _, c := range cards {
+			p := c.PhoneProfile()
+			if callswitch.IsPhone(c.Profile) || p == "" {
+				continue
+			}
+			if err := env.SetProfile(c, p); err != nil {
+				logger.Printf("%s: profile %s: %v", c.Name, p, err)
+				continue
+			}
+			logger.Printf("%s: %s -> %s", c.Name, c.Profile, p)
+		}
 	}
-	return wpconf.ParseVersion(string(out))
+	r, err := desktop.Routing()
+	if err != nil {
+		logger.Printf("routing: %v", err)
+		return
+	}
+	ch := callswitch.RouteFor(r, addrs, device)
+	for _, c := range ch {
+		if err := desktop.SetTarget(c); err != nil {
+			logger.Printf("routing: %v", err)
+			return
+		}
+	}
+	if len(ch) > 0 {
+		logger.Printf("bt-headset-hid: %s", callswitch.Describe(ch, r))
+	}
 }

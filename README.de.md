@@ -118,9 +118,9 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    (`journalctl --user -u bt-headset-hid-session -f`). Bei `-mode ofono` schaltet er erst beim
    Abnehmen um, und nur das Headset, mit dem du abnimmst; solange es klingelt, piepsen die Headsets
    selbst. Pausiert wird über MPRIS, das die meisten Player und Browser können. Ein Headset, das du erst
-   nach `install` koppelst, wird ein paar Sekunden nach dem Koppeln von selbst eingerichtet: Der
-   Benutzerdienst nimmt es auf und startet PipeWire und WirePlumber neu (in seinem Protokoll steht
-   `newly paired headset ... set up`); ein schon laufendes Softphone danach neu starten. Headsets, die bei `install` schon gekoppelt waren und die du
+   nach `install` koppelst, wird ein paar Sekunden nach dem Koppeln von selbst eingerichtet, ganz
+   ohne Neustart (im Protokoll des Benutzerdienstes steht `newly paired headset ... set up`).
+   Headsets, die bei `install` schon gekoppelt waren und die du
    nicht gewählt hast, bleiben aussen vor. Ein Headset, das du entkoppelst (in den
    Bluetooth-Einstellungen entfernst), wird von selbst ausgetragen, ohne Neustart, und beim
    erneuten Koppeln nicht wieder eingerichtet.
@@ -140,14 +140,15 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   `~/.config/wireplumber/bluetooth.lua.d/`, ab 0.5: `~/.config/wireplumber/wireplumber.conf.d/`),
   entfernt die Datei der jeweils anderen Version und startet PipeWire neu; `-remove` macht es
   rückgängig. Ohne `-mode` bleibt der bisher eingerichtete Modus. Von Hand: die passende Datei aus `contrib/wireplumber/` an den Pfad kopieren, der in
-  ihren ersten Zeilen steht. Bei `-mode pipewire` und `-mode ofono` richtet es ausserdem die Headsets ein: Eine
-  WirePlumber-Regel (`52-bt-headset-hid-headset.lua` bzw. `.conf`) gibt ihrem Telefon-Audio einen
-  gemeinsamen Namen, `~/.config/systemd/user/bt-headset-hid-session.service` schaltet sie für
-  Gespräche ins Telefonprofil, und `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` legt Lautsprecher und Mikrofon
-  `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, geht das Gespräch
-  bei `-mode ofono` an das, mit dem du abnimmst oder wählst, sodass die Standardausgabe z. B. ein
-  Bluetooth-Lautsprecher bleiben kann; sonst an das, das in den Toneinstellungen als Ausgabe gewählt
-  ist; mit `-profile phone` an das erste, das PipeWire findet). Es nimmt die bisher eingerichteten
+  ihren ersten Zeilen steht. Bei `-mode pipewire` und `-mode ofono` richtet es ausserdem die Headsets ein: Ihre Liste kommt
+  nach `~/.config/bt-headset-hid/headsets`, `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf`
+  legt Lautsprecher und Mikrofon `bt-headset-hid` an, und der Benutzerdienst
+  `~/.config/systemd/user/bt-headset-hid-session.service` schaltet die Headsets für Gespräche ins
+  Telefonprofil und richtet Lautsprecher und Mikrofon `bt-headset-hid` im laufenden Betrieb auf
+  den Gesprächston des verbundenen aus, sodass eine Änderung der Liste keinen Neustart braucht
+  (sind zwei verbunden, geht das Gespräch bei `-mode ofono` an das, mit dem du abnimmst oder
+  wählst, sodass die Standardausgabe z. B. ein Bluetooth-Lautsprecher bleiben kann; sonst an das,
+  das in den Toneinstellungen als Ausgabe gewählt ist; mit `-profile phone` an das erste der Liste). Es nimmt die bisher eingerichteten
   Headsets, sonst das gekoppelte, und fragt nach, wenn mehrere gekoppelt sind (ohne Terminal nimmt
   es die verbundenen, sonst alle); um mehrere einzurichten, etwa eines fürs Büro und eines für zu
   Hause, oder zum Wechseln: `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Die in dem Moment
@@ -155,10 +156,13 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   `~/.config/bt-headset-hid/known-headsets`; sie werden auch nach erneutem Koppeln nicht wieder
   eingerichtet. Ein Headset, das später zum ersten Mal gekoppelt wird, steht nicht darauf, und der
   Benutzerdienst richtet es von selbst ein. Ausserdem schaltet es WirePlumbers eigenen
-  Wechsel ins Telefonprofil ab (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), der bei einem
+  Wechsel ins Telefonprofil ab (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`, 0.5:
+  `wireplumber.conf.d/52-bt-headset-hid-headset.conf`), der bei einem
   Gespräch jedes Bluetooth-Headset umschalten würde. Mit `-profile phone` bleiben die Headsets
-  stattdessen immer im Telefonprofil; der Benutzerdienst richtet dann nur neu gekoppelte Headsets
-  ein (`-profile switch` schaltet zurück).
+  stattdessen immer im Telefonprofil; der Benutzerdienst schaltet sie beim Verbinden dorthin
+  (`-profile switch` schaltet zurück). PipeWire startet der Befehl nur neu, wenn sich eine Datei
+  von WirePlumber oder PipeWire geändert hat; die WirePlumber-Regeln pro Headset älterer
+  Versionen entfernt er dabei.
 - Nur für `-mode pipewire`: `sudo systemctl disable --now ModemManager` (Mobilfunkmodems gehen
   nicht, solange bt-headset-hid läuft) und
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire muss mit

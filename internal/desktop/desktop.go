@@ -5,11 +5,13 @@
 package desktop
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -75,6 +77,63 @@ func (s System) SetOutput(name string) error {
 		return fmt.Errorf("pw-metadata: %v: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+// Routing reads the streams of the fixed devices and the call audio of the
+// headsets from PipeWire.
+func Routing() (callswitch.Routing, error) {
+	out, err := exec.Command("pw-dump").Output()
+	if err != nil {
+		return callswitch.Routing{}, fmt.Errorf("pw-dump: %w", err)
+	}
+	return callswitch.ParseRouting(out)
+}
+
+// SetTarget points a stream at a node (by its object.serial), or back at the
+// default device if c.Value is "".
+func SetTarget(c callswitch.Change) error {
+	args := []string{"-n", "default", strconv.Itoa(int(c.Subject)), callswitch.TargetKey, c.Value, "Spa:Id"}
+	if c.Value == "" {
+		args = []string{"-n", "default", "-d", strconv.Itoa(int(c.Subject)), callswitch.TargetKey}
+	}
+	out, err := exec.Command("pw-metadata", args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("pw-metadata: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// Monitor runs "pw-dump --monitor" and sends on changed, without blocking,
+// whenever PipeWire's objects change, until ctx ends. It starts it again
+// when it ends, as it does when PipeWire restarts.
+func Monitor(ctx context.Context, changed chan<- struct{}, logf func(string, ...any)) {
+	for {
+		cmd := exec.CommandContext(ctx, "pw-dump", "--monitor", "--no-colors")
+		out, err := cmd.StdoutPipe()
+		if err == nil {
+			err = cmd.Start()
+		}
+		if err != nil {
+			logf("pw-dump --monitor: %v", err)
+		} else {
+			buf := make([]byte, 64<<10)
+			for {
+				if _, err := out.Read(buf); err != nil {
+					break
+				}
+				select {
+				case changed <- struct{}{}:
+				default:
+				}
+			}
+			cmd.Wait()
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 func (s System) SetProfile(c callswitch.Card, profile string) error {

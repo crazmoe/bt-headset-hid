@@ -73,6 +73,7 @@ type Facts struct {
 
 	WPMode     string   // mode of the user's WirePlumber configuration, "" if none
 	Configured []string // headsets set up in the user's configuration
+	OldRules   bool     // WirePlumber rules for every headset from an older version
 	Session    State    // user's bt-headset-hid-session.service
 }
 
@@ -313,6 +314,11 @@ func (c *checker) audio(f Facts) {
 		}
 		c.add(OK, "Headsets für Gesprächston: "+strings.Join(f.Configured, ", "),
 			"headsets for call audio: "+strings.Join(f.Configured, ", "), "")
+	}
+	if f.OldRules {
+		c.add(Warn, "WirePlumber-Regeln pro Headset aus einer älteren Version, neue Headsets brauchen damit einen Neustart",
+			"WirePlumber rules for every headset from an older version, new headsets need a restart with them",
+			"bt-headset-hid wireplumber")
 	}
 	if f.Session != Active && f.Session != "" {
 		c.add(Fail, "Benutzerdienst bt-headset-hid-session läuft nicht", "user service bt-headset-hid-session is not running",

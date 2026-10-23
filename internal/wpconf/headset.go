@@ -2,7 +2,6 @@ package wpconf
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,16 +9,18 @@ import (
 	"strings"
 )
 
-// The call audio nodes of every bt-headset-hid headset get these names, so
-// the fixed "bt-headset-hid" speaker and microphone follow whichever of them
-// is connected.
-const (
-	HeadsetOutput = "bluez_output.bt-headset-hid.1"
-	HeadsetInput  = "bluez_input.bt-headset-hid.0"
-)
+// HeadsetsPath is the list of the headsets set up for call audio, below the
+// configuration directory dir. "bt-headset-hid session" reads it and points
+// the "bt-headset-hid" speaker and microphone at the one connected, so
+// changing it needs no restart of WirePlumber.
+func HeadsetsPath(dir string) string {
+	return filepath.Join(dir, "bt-headset-hid", "headsets")
+}
 
-// HeadsetPaths returns the WirePlumber file that keeps the headsets in the
-// phone profile for v and the file of the other configuration format.
+// HeadsetPaths returns the WirePlumber file of the headsets for v and the
+// file of the other configuration format. Older versions wrote rules for
+// every headset there; now the 0.5 file only turns off WirePlumber's own
+// switch to the phone profile, and 0.4 needs none.
 func HeadsetPaths(dir string, v Version) (target, other string) {
 	lua := filepath.Join(dir, "wireplumber", "bluetooth.lua.d", "52-bt-headset-hid-headset.lua")
 	conf := filepath.Join(dir, "wireplumber", "wireplumber.conf.d", "52-bt-headset-hid-headset.conf")
@@ -29,117 +30,72 @@ func HeadsetPaths(dir string, v Version) (target, other string) {
 	return conf, lua
 }
 
-// headsetIDs checks the Bluetooth addresses and returns them in upper case
-// and with underscores, as PipeWire uses them in names.
-func headsetIDs(addrs []string) (upper, ids []string, err error) {
-	if len(addrs) == 0 {
-		return nil, nil, errors.New("wpconf: no headset")
-	}
+// headsetIDs checks the Bluetooth addresses and returns them in upper case,
+// without duplicates.
+func headsetIDs(addrs []string) ([]string, error) {
 	seen := map[string]bool{}
+	var upper []string
 	for _, a := range addrs {
 		a = strings.ToUpper(strings.TrimSpace(a))
 		if !addressRE.MatchString(a) {
-			return nil, nil, errNotAddress(a)
+			return nil, errNotAddress(a)
 		}
-		if seen[a] {
-			continue
+		if !seen[a] {
+			seen[a] = true
+			upper = append(upper, a)
 		}
-		seen[a] = true
-		upper = append(upper, a)
-		ids = append(ids, strings.ReplaceAll(a, ":", "_"))
 	}
-	return upper, ids, nil
+	return upper, nil
 }
 
-// PhoneMarker marks headset rules that keep the headsets in the phone
-// profile all the time instead of switching for calls.
+// PhoneMarker marks a headset list whose headsets stay in the phone profile
+// all the time instead of switching for calls.
 const PhoneMarker = "bt-headset-hid-profile: phone"
 
-// HeadsetContent returns the WirePlumber rules for the headsets with the
-// Bluetooth addresses addrs.
-//
-// The rules rename the call audio nodes of all these headsets to
-// HeadsetOutput and HeadsetInput, the targets of the fixed devices. If more
-// than one of them is in the phone profile, WirePlumber uses the first it
-// finds.
-//
-// With phone, the headsets also start in the phone profile (HFP) instead of
-// A2DP and stay there, which needs no "bt-headset-hid session". Without,
-// WirePlumber's own switch to the phone profile, which would switch every
-// Bluetooth headset when a call starts, is turned off (for 0.4 by a separate
-// policy file that InstallHeadset writes). Other Bluetooth devices keep A2DP
-// either way.
-func HeadsetContent(addrs []string, v Version, phone bool) ([]byte, error) {
-	upper, ids, err := headsetIDs(addrs)
+// HeadsetsContent returns the headset list for addrs.
+func HeadsetsContent(addrs []string, phone bool) ([]byte, error) {
+	upper, err := headsetIDs(addrs)
 	if err != nil {
 		return nil, err
 	}
-	list := strings.Join(upper, ", ")
-	what := "switch to the phone profile (HFP) for calls (bt-headset-hid session)"
-	if phone {
-		what = "start in the phone profile (HFP) and stay there; " + PhoneMarker
-	}
 	var b strings.Builder
-	if v.Lua() {
-		fmt.Fprintf(&b, "-- bt-headset-hid: the headsets %s %s.\n", list, what)
-		b.WriteString("-- ~/.config/wireplumber/bluetooth.lua.d/52-bt-headset-hid-headset.lua, written by \"bt-headset-hid wireplumber\".\n")
-		b.WriteString("-- Their call audio gets one name, so the \"bt-headset-hid\" speaker and microphone use the one connected.\n")
-		for _, id := range ids {
-			if phone {
-				fmt.Fprintf(&b, `table.insert(bluez_monitor.rules, {
-  matches = { { { "device.name", "equals", "bluez_card.%s" } } },
-  apply_properties = { ["device.profile"] = "headset-head-unit" },
-})
-`, id)
-			}
-			fmt.Fprintf(&b, `table.insert(bluez_monitor.rules, {
-  matches = { { { "node.name", "equals", "bluez_output.%[1]s.1" }, { "factory.name", "equals", "api.bluez5.sco.sink" } } },
-  apply_properties = { ["node.name"] = "%[2]s" },
-})
-table.insert(bluez_monitor.rules, {
-  matches = { { { "node.name", "equals", "bluez_input.%[1]s.0" }, { "factory.name", "equals", "api.bluez5.sco.source" } } },
-  apply_properties = { ["node.name"] = "%[3]s" },
-})
-`, id, HeadsetOutput, HeadsetInput)
-		}
-		return []byte(b.String()), nil
+	b.WriteString("# Headsets for call audio through the \"bt-headset-hid\" speaker and microphone; written by \"bt-headset-hid\".\n")
+	b.WriteString("# Change them with \"bt-headset-hid wireplumber -headset XX:XX:XX:XX:XX:XX,...\".\n")
+	if phone {
+		b.WriteString("# " + PhoneMarker + "\n")
 	}
-	fmt.Fprintf(&b, "# bt-headset-hid: the headsets %s %s.\n", list, what)
-	b.WriteString("# ~/.config/wireplumber/wireplumber.conf.d/52-bt-headset-hid-headset.conf, written by \"bt-headset-hid wireplumber\".\n")
-	b.WriteString("# Their call audio gets one name, so the \"bt-headset-hid\" speaker and microphone use the one connected.\n")
-	b.WriteString("monitor.bluez.rules = [\n")
-	for _, id := range ids {
-		if phone {
-			fmt.Fprintf(&b, `  {
-    matches = [ { device.name = "bluez_card.%s" } ]
-    actions = { update-props = { device.profile = "headset-head-unit" } }
-  }
-`, id)
-		}
-		fmt.Fprintf(&b, `  {
-    matches = [ { node.name = "bluez_output.%[1]s.1", factory.name = "api.bluez5.sco.sink" } ]
-    actions = { update-props = { node.name = "%[2]s" } }
-  }
-  {
-    matches = [ { node.name = "bluez_input.%[1]s.0", factory.name = "api.bluez5.sco.source" } ]
-    actions = { update-props = { node.name = "%[3]s" } }
-  }
-`, id, HeadsetOutput, HeadsetInput)
-	}
-	b.WriteString("]\n")
-	if !phone {
-		b.WriteString(`# "bt-headset-hid session" switches the profile for calls; WirePlumber's own switch
-# would put every Bluetooth headset into the phone profile when a call starts.
-wireplumber.settings = {
-  bluetooth.autoswitch-to-headset-profile = false
-}
-`)
+	for _, a := range upper {
+		b.WriteString(a + "\n")
 	}
 	return []byte(b.String()), nil
 }
 
+// SetHeadsets writes the headset list, which "bt-headset-hid session" follows
+// without a restart of WirePlumber.
+func SetHeadsets(dir string, addrs []string, phone bool) error {
+	data, err := HeadsetsContent(addrs, phone)
+	if err != nil {
+		return err
+	}
+	p := HeadsetsPath(dir)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(p, data, 0o644)
+}
+
+// noAutoswitchConf turns off WirePlumber 0.5's own switch to the phone
+// profile, see InstallHeadset.
+const noAutoswitchConf = `# bt-headset-hid: "bt-headset-hid session" switches the headsets to the phone profile for calls;
+# WirePlumber's own switch would put every Bluetooth headset into the phone profile when a call starts.
+# ~/.config/wireplumber/wireplumber.conf.d/52-bt-headset-hid-headset.conf, written by "bt-headset-hid wireplumber".
+wireplumber.settings = {
+  bluetooth.autoswitch-to-headset-profile = false
+}
+`
+
 // noAutoswitchPath is the WirePlumber 0.4 policy file that turns off
-// WirePlumber's own switch to the phone profile, see HeadsetContent.
+// WirePlumber's own switch to the phone profile.
 func noAutoswitchPath(dir string) string {
 	return filepath.Join(dir, "wireplumber", "policy.lua.d", "52-bt-headset-hid-session.lua")
 }
@@ -150,42 +106,55 @@ const noAutoswitchLua = `-- bt-headset-hid: "bt-headset-hid session" switches th
 bluetooth_policy.policy["media-role.use-headset-profile"] = false
 `
 
-// InstallHeadset writes the rules for the headsets addrs (see HeadsetContent), removes the file of
-// the other format and returns the path written.
+// InstallHeadset writes the headset list for addrs (see SetHeadsets) and the
+// WirePlumber setting for v: unless phone, WirePlumber's own switch to the
+// phone profile, which would switch every Bluetooth headset when a call
+// starts, is turned off, since "bt-headset-hid session" switches the
+// headsets. It removes the per-headset rules of older versions and returns
+// the path of the list.
 func InstallHeadset(dir string, addrs []string, v Version, phone bool) (string, error) {
-	data, err := HeadsetContent(addrs, v, phone)
-	if err != nil {
+	if err := SetHeadsets(dir, addrs, phone); err != nil {
 		return "", err
 	}
 	target, other := HeadsetPaths(dir, v)
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(target, data, 0o644); err != nil {
-		return "", err
-	}
-	if err := os.Remove(other); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return "", err
-	}
 	na := noAutoswitchPath(dir)
-	if phone || !v.Lua() {
-		if err := os.Remove(na); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	remove := []string{other}
+	switch {
+	case phone:
+		remove = append(remove, target, na)
+	case v.Lua():
+		remove = append(remove, target)
+		if err := writeFile(na, []byte(noAutoswitchLua)); err != nil {
 			return "", err
 		}
-		return target, nil
+	default:
+		remove = append(remove, na)
+		if err := writeFile(target, []byte(noAutoswitchConf)); err != nil {
+			return "", err
+		}
 	}
-	if err := os.MkdirAll(filepath.Dir(na), 0o755); err != nil {
-		return "", err
+	for _, p := range remove {
+		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return "", err
+		}
 	}
-	return target, os.WriteFile(na, []byte(noAutoswitchLua), 0o644)
+	return HeadsetsPath(dir), nil
 }
 
-// RemoveHeadset deletes the headset rules in both formats, and the policy
-// file of InstallHeadset, and returns the paths that existed.
+func writeFile(p string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(p, data, 0o644)
+}
+
+// RemoveHeadset deletes the headset list and the WirePlumber files of
+// InstallHeadset, also those of older versions, and returns the paths that
+// existed.
 func RemoveHeadset(dir string) ([]string, error) {
 	a, b := HeadsetPaths(dir, Version{0, 5})
 	var removed []string
-	for _, p := range []string{a, b, noAutoswitchPath(dir)} {
+	for _, p := range []string{HeadsetsPath(dir), a, b, noAutoswitchPath(dir)} {
 		err := os.Remove(p)
 		switch {
 		case err == nil:
@@ -197,13 +166,26 @@ func RemoveHeadset(dir string) ([]string, error) {
 	return removed, nil
 }
 
-var (
-	headsetRE = regexp.MustCompile(`"bluez_output\.((?:[0-9A-F]{2}_){5}[0-9A-F]{2})\.1"`)
-)
+// OldRules reports whether WirePlumber rules for every headset from an
+// older version are still there; they need a restart of PipeWire to go.
+func OldRules(dir string) bool {
+	a, b := HeadsetPaths(dir, Version{0, 5})
+	for _, p := range []string{a, b} {
+		if data, err := os.ReadFile(p); err == nil && headsetRE.Match(data) {
+			return true
+		}
+	}
+	return false
+}
 
-// ConfiguredPhone reports whether the headset rules keep the headsets in the
-// phone profile all the time.
+var headsetRE = regexp.MustCompile(`"bluez_output\.((?:[0-9A-F]{2}_){5}[0-9A-F]{2})\.1"`)
+
+// ConfiguredPhone reports whether the headsets stay in the phone profile all
+// the time.
 func ConfiguredPhone(dir string) bool {
+	if data, err := os.ReadFile(HeadsetsPath(dir)); err == nil {
+		return strings.Contains(string(data), PhoneMarker)
+	}
 	a, b := HeadsetPaths(dir, Version{0, 5})
 	for _, p := range []string{a, b} {
 		if data, err := os.ReadFile(p); err == nil && strings.Contains(string(data), PhoneMarker) {
@@ -213,9 +195,19 @@ func ConfiguredPhone(dir string) bool {
 	return false
 }
 
-// ConfiguredHeadsets returns the addresses of the headsets set up before, in
-// either format, or nil if there are none.
+// ConfiguredHeadsets returns the addresses of the headsets set up, or nil if
+// there are none. Without a headset list it reads those of older versions'
+// rules.
 func ConfiguredHeadsets(dir string) []string {
+	if data, err := os.ReadFile(HeadsetsPath(dir)); err == nil {
+		var addrs []string
+		for _, l := range strings.Split(string(data), "\n") {
+			if l = strings.ToUpper(strings.TrimSpace(l)); addressRE.MatchString(l) {
+				addrs = append(addrs, l)
+			}
+		}
+		return addrs
+	}
 	a, b := HeadsetPaths(dir, Version{0, 5})
 	var addrs []string
 	seen := map[string]bool{}

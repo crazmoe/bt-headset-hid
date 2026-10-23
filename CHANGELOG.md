@@ -16,8 +16,16 @@ version and the output of `journalctl -u bt-headset-hid`, as a
   problem, in German or English after the desktop language. `install` points to it at the end.
 - `install` and `bt-headset-hid wireplumber` ask which headsets to set up when several are
   paired, instead of setting up none; without a terminal they take the connected ones, or all.
-- Modes pipewire and ofono: a headset paired after `install` is set up by itself; the user
-  service `bt-headset-hid-session` adds it and restarts PipeWire and WirePlumber. Headsets that were already
+- Modes pipewire and ofono: the user service `bt-headset-hid-session` now points the
+  `bt-headset-hid` speaker and microphone at the call audio of the connected headset while
+  everything runs (`target.object` in PipeWire's metadata), instead of WirePlumber rules that
+  renamed the call audio of every headset. The headsets are a list in
+  `~/.config/bt-headset-hid/headsets`, and changing it needs no restart of PipeWire or
+  WirePlumber. With `-profile phone` the user service puts the headsets in the phone profile.
+  `bt-headset-hid wireplumber` removes the old rules and restarts PipeWire only when one of its
+  files changed.
+- Modes pipewire and ofono: a headset paired after `install` is set up by itself, without a
+  restart; the user service `bt-headset-hid-session` adds it. Headsets that were already
   paired when the headsets were last set up stay left out (`~/.config/bt-headset-hid/known-headsets`).
   The user service therefore now also runs with `-profile phone` and without a headset yet.
 - Modes pipewire and ofono: a headset you unpair is taken out of the configuration by itself,

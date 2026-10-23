@@ -52,6 +52,7 @@ func runWirePlumber(args []string) error {
 		}
 	}
 
+	snapshot := wpconf.Snapshot(dir)
 	session := false
 	if *remove {
 		removed, err := wpconf.Remove(dir)
@@ -109,11 +110,15 @@ func runWirePlumber(args []string) error {
 		}
 	}
 
-	if !*noRestart {
+	// The headset list alone needs no restart: the session service follows
+	// it.
+	if changed := wpconf.Snapshot(dir) != snapshot; changed && !*noRestart {
 		fmt.Println("restarting PipeWire and WirePlumber")
 		if err := restartPipeWire(); err != nil {
 			return err
 		}
+	} else if changed {
+		fmt.Println("restart PipeWire and WirePlumber for the change: systemctl --user restart pipewire wireplumber")
 	}
 	if session {
 		if err := startSession(dir, !*noRestart); err != nil {
@@ -214,24 +219,20 @@ func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, erro
 	if err := wpconf.SetKnown(dir, append(known, addrs...)); err != nil {
 		return false, err
 	}
-	if len(addrs) == 0 {
-		if _, err := wpconf.RemoveHeadset(dir); err != nil {
-			return false, err
-		}
-		fmt.Println("no headset paired yet: pair it as usual, it is set up by itself once paired")
-	} else {
-		path, err := wpconf.InstallHeadset(dir, addrs, v, profile == "phone")
-		if err != nil {
-			return false, err
-		}
-		if profile == "phone" {
-			fmt.Printf("wrote %s: %s stay in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
-		} else {
-			fmt.Printf("wrote %s: %s\n", path, name)
-			fmt.Println("  they play music (A2DP) and switch to the phone profile for calls; always the phone profile: -profile phone")
-		}
+	path, err := wpconf.InstallHeadset(dir, addrs, v, profile == "phone")
+	if err != nil {
+		return false, err
 	}
-	path, err := wpconf.InstallDevices(dir)
+	switch {
+	case len(addrs) == 0:
+		fmt.Println("no headset paired yet: pair it as usual, it is set up by itself once paired")
+	case profile == "phone":
+		fmt.Printf("wrote %s: %s stay in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
+	default:
+		fmt.Printf("wrote %s: %s\n", path, name)
+		fmt.Println("  they play music (A2DP) and switch to the phone profile for calls; always the phone profile: -profile phone")
+	}
+	path, err = wpconf.InstallDevices(dir)
 	if err != nil {
 		return false, err
 	}
