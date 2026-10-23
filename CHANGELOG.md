@@ -8,7 +8,7 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
-## Unreleased
+## 0.6.0
 
 - The user service no longer keeps a CPU core about 15 % busy: it answered every change in
   PipeWire with `pw-dump`, whose own connection is such a change, so it ran three times a second
