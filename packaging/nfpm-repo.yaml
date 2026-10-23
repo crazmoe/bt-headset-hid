@@ -1,0 +1,15 @@
+  # Appended to the contents of nfpm.yaml by release.yml once
+  # packaging/repo-key.asc exists: the package then brings its own package
+  # repository, so updates come with the system's updates.
+  - src: packaging/repo-key.asc
+    dst: /usr/share/keyrings/bt-headset-hid.asc
+    file_info:
+      mode: 0644
+  - src: packaging/repo/bt-headset-hid.sources
+    dst: /etc/apt/sources.list.d/bt-headset-hid.sources
+    type: config
+    packager: deb
+  - src: packaging/repo/bt-headset-hid.repo
+    dst: /etc/yum.repos.d/bt-headset-hid.repo
+    type: config|noreplace
+    packager: rpm

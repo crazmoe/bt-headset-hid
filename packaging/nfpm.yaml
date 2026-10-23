@@ -1,6 +1,8 @@
 # deb and rpm packages, built by .github/workflows/release.yml with
-# VERSION and ARCH (amd64, arm64) set. The package only ships the program
-# and docs; "sudo bt-headset-hid install" writes the mode-dependent files.
+# VERSION and ARCH (amd64, arm64) set. The package ships the program, the
+# user service and docs; postinstall runs "bt-headset-hid install
+# -system-only", which writes the mode-dependent files, and the user service
+# sets up each user's PipeWire at login.
 name: bt-headset-hid
 version: ${VERSION}
 arch: ${ARCH}
@@ -18,11 +20,20 @@ recommends:
   - bluez
   - wireplumber
 
+scripts:
+  postinstall: packaging/postinstall.sh
+  preremove: packaging/preremove.sh
+
+# contents stays last: release.yml appends nfpm-repo.yaml to it.
 contents:
   - src: build/bt-headset-hid
     dst: /usr/bin/bt-headset-hid
     file_info:
       mode: 0755
+  - src: packaging/bt-headset-hid-session.service
+    dst: /usr/lib/systemd/user/bt-headset-hid-session.service
+    file_info:
+      mode: 0644
   - src: README.md
     dst: /usr/share/doc/bt-headset-hid/README.md
   - src: README.de.md
@@ -34,7 +45,3 @@ contents:
   - src: contrib/
     dst: /usr/share/doc/bt-headset-hid/contrib/
     type: tree
-
-scripts:
-  postinstall: packaging/postinstall.sh
-  preremove: packaging/preremove.sh

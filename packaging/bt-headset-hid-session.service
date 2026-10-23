@@ -1,0 +1,18 @@
+# /usr/lib/systemd/user/bt-headset-hid-session.service, from the bt-headset-hid
+# package and enabled for every user (systemctl --global). At login it sets up
+# the user's PipeWire for the mode of "sudo bt-headset-hid install", then
+# switches the headsets to the phone profile for calls, pauses media players
+# and sets up headsets paired later. "bt-headset-hid wireplumber -remove"
+# turns it off for one user.
+[Unit]
+Description=bt-headset-hid: headsets to the phone profile during calls, media paused
+After=pipewire.service wireplumber.service
+ConditionPathExists=/etc/systemd/system/bt-headset-hid.service
+
+[Service]
+ExecStart=/usr/bin/bt-headset-hid session
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

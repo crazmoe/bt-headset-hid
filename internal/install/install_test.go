@@ -194,3 +194,24 @@ func TestSudoUser(t *testing.T) {
 		}
 	}
 }
+
+// The package's user service runs the packaged program, and only once the
+// system part is installed.
+func TestPackagedSessionUnit(t *testing.T) {
+	data, err := os.ReadFile("../../packaging/bt-headset-hid-session.service")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"\nExecStart=" + PackagedBinary + " session\n", "\nConditionPathExists=" + Unit + "\n"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("packaging/bt-headset-hid-session.service lacks %q", want)
+		}
+	}
+	nfpm, err := os.ReadFile("../../packaging/nfpm.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(nfpm), "dst: "+PackagedSessionUnit+"\n") {
+		t.Errorf("packaging/nfpm.yaml does not install %s", PackagedSessionUnit)
+	}
+}

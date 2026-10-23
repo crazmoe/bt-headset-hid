@@ -42,11 +42,17 @@ jobs:
           set -eu
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
           export VERSION="${TAG#v}"
+          # With the repository key, the packages bring the package
+          # repository (see docs/REPOSITORY.md).
+          cp packaging/nfpm.yaml build/nfpm.yaml
+          if [ -f packaging/repo-key.asc ]; then
+            cat packaging/nfpm-repo.yaml >> build/nfpm.yaml
+          fi
           for ARCH in amd64 arm64; do
             export ARCH
             cp "build/bt-headset-hid_${VERSION}_linux_${ARCH}/bt-headset-hid" build/bt-headset-hid
             for fmt in deb rpm; do
-              "$(go env GOPATH)/bin/nfpm" package -f packaging/nfpm.yaml -p "$fmt" -t dist/
+              "$(go env GOPATH)/bin/nfpm" package -f build/nfpm.yaml -p "$fmt" -t dist/
             done
           done
           (cd dist && sha256sum * > SHA256SUMS)

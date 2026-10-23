@@ -1,16 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
+	"github.com/crazmoe/bt-headset-hid/internal/doctor"
 	"github.com/crazmoe/bt-headset-hid/internal/install"
 )
 
@@ -22,14 +20,16 @@ func runInstall(args []string, uninstall bool) error {
 	}
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	mode := ""
+	systemOnly := false
 	if !uninstall {
-		fs.StringVar(&mode, "mode", "", `"ofono": all buttons and call audio, ModemManager stays free; "pipewire": PipeWire keeps HFP and the audio; "hfp": all buttons, no call audio (asked if not given)`)
+		fs.StringVar(&mode, "mode", "", `"ofono": all buttons and call audio, ModemManager stays free; "pipewire": PipeWire keeps HFP and the audio; "hfp": all buttons, no call audio (default: as before, else ofono if it works here)`)
+		fs.BoolVar(&systemOnly, "system-only", false, `only the system part; the session service sets up each user's PipeWire at login (used by the package)`)
 	}
 	fs.Usage = func() {
 		if uninstall {
 			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid uninstall")
 		} else {
-			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid install [-mode ofono|pipewire|hfp]")
+			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid install [-mode ofono|pipewire|hfp] [-system-only]")
 		}
 		fs.PrintDefaults()
 	}
@@ -40,10 +40,7 @@ func runInstall(args []string, uninstall bool) error {
 		return errors.New("run with sudo")
 	}
 	if !uninstall && mode == "" {
-		var err error
-		if mode, err = askMode(os.Stdin); err != nil {
-			return err
-		}
+		mode = chooseMode()
 	}
 	if mode == "pipewire" {
 		out, _ := exec.Command("pipewire", "--version").CombinedOutput()
@@ -62,9 +59,9 @@ func runInstall(args []string, uninstall bool) error {
 		return err
 	}
 	o := install.Options{Mode: mode, Self: self}
-	if user, uid, ok := install.SudoUser(os.Getenv); ok {
+	if user, uid, ok := install.SudoUser(os.Getenv); ok && !systemOnly {
 		o.User, o.UID = user, uid
-	} else {
+	} else if !systemOnly {
 		step := "wireplumber -mode " + mode
 		if uninstall {
 			step = "wireplumber -remove"
@@ -87,35 +84,38 @@ func runInstall(args []string, uninstall bool) error {
 		fmt.Println("bt-headset-hid removed. If you use ModemManager and mode pipewire stopped it: sudo systemctl enable --now ModemManager")
 		return nil
 	}
-	fmt.Println("bt-headset-hid installed in mode", mode+". Reconnect the headset, then check the setup as your normal user:")
+	fmt.Println("bt-headset-hid installed in mode", mode+".")
+	if o.User == "" {
+		fmt.Println("Each desktop user's PipeWire is set up at their next login (or now, as that user: bt-headset-hid wireplumber).")
+	}
+	fmt.Println("Reconnect the headset, then check the setup as your normal user:")
 	fmt.Println("  bt-headset-hid doctor")
 	return nil
 }
 
-// askMode asks for the mode on the terminal.
-func askMode(in io.Reader) (string, error) {
-	fmt.Println("Which mode?")
-	fmt.Println("  1) ofono:    talk through the headset with all buttons; mobile broadband (ModemManager) keeps working (recommended)")
-	fmt.Println("  2) pipewire: talk through the headset; only answer and hang up work; ModemManager is switched off")
-	fmt.Println("  3) hfp:      all buttons (redial, volume) work, but no call audio through the headset")
-	r := bufio.NewReader(in)
-	for {
-		fmt.Print("Choose 1, 2 or 3 [1]: ")
-		line, err := r.ReadString('\n')
-		answer := strings.TrimSpace(line)
-		if err != nil && answer == "" {
-			return "", errors.New("no mode chosen; use -mode ofono, pipewire or hfp")
-		}
-		switch answer {
-		case "", "1", "ofono":
-			return "ofono", nil
-		case "2", "pipewire":
-			return "pipewire", nil
-		case "3", "hfp":
-			return "hfp", nil
-		}
-		if err != nil {
-			return "", errors.New("no mode chosen; use -mode ofono, pipewire or hfp")
+// chooseMode keeps the mode of an earlier installation, or picks one that
+// works here, preferring ofono.
+func chooseMode() string {
+	if unit, err := os.ReadFile(install.Unit); err == nil {
+		if m := doctor.ModeFromUnit(unit); m != "" {
+			fmt.Println("mode", m, "as before; to change it: -mode ofono, pipewire or hfp")
+			return m
 		}
 	}
+	out, _ := exec.Command("pipewire", "--version").CombinedOutput()
+	mode, why := install.PickMode(install.System{
+		OFono:        unitState(false, "ofono.service") == doctor.Active,
+		OFonoBackend: ofonoBackend(),
+		PipeWireOK:   install.CheckPipeWire(string(out), "") == nil,
+		ModemManager: unitState(false, "ModemManager.service") == doctor.Active,
+	})
+	switch mode {
+	case "ofono":
+		fmt.Println("mode ofono: all buttons and call audio through the headset")
+	case "pipewire":
+		fmt.Printf("mode pipewire, since %s: call audio through the headset, but only answer and hang up\n", why)
+	default:
+		fmt.Printf("mode hfp, since %s: all buttons, but no call audio through the headset\n", why)
+	}
+	return mode
 }
