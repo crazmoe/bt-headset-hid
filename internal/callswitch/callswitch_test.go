@@ -73,15 +73,15 @@ func TestSwitcher(t *testing.T) {
 		settled++
 		env.log = append(env.log, "settle")
 	}}
-	s.Call(true)
-	s.Call(true)
+	s.Call(true, Route{})
+	s.Call(true, Route{})
 	want := []string{"pause org.mpris.MediaPlayer2.spotify", "profile bluez_card.JBL headset-head-unit"}
 	if !reflect.DeepEqual(env.log, want) || !s.InCall() {
 		t.Fatalf("call start: %q, want %q", env.log, want)
 	}
 	env.log = nil
-	s.Call(false)
-	s.Call(false)
+	s.Call(false, Route{})
+	s.Call(false, Route{})
 	want = []string{"profile bluez_card.JBL a2dp-sink", "settle", "play org.mpris.MediaPlayer2.spotify"}
 	if !reflect.DeepEqual(env.log, want) || s.InCall() {
 		t.Fatalf("call end: %q, want %q", env.log, want)
@@ -97,8 +97,8 @@ func TestSwitcherDefaultOutput(t *testing.T) {
 	jabra.Default = true
 	env := &fakeEnv{cards: []Card{jbl, jabra}}
 	s := &Switcher{Env: env}
-	s.Call(true)
-	s.Call(false)
+	s.Call(true, Route{})
+	s.Call(false, Route{})
 	want := []string{"profile bluez_card.JABRA headset-head-unit", "profile bluez_card.JABRA a2dp-sink"}
 	if !reflect.DeepEqual(env.log, want) {
 		t.Errorf("log %q, want %q", env.log, want)
@@ -110,8 +110,8 @@ func TestSwitcherRestoresOutput(t *testing.T) {
 	jabra.Default = true
 	env := &fakeEnv{cards: []Card{jbl, jabra}, output: "bluez_output.JABRA.1", moveOutput: "bluez_output.JBL.1"}
 	s := &Switcher{Env: env, Settle: func() { env.log = append(env.log, "settle") }}
-	s.Call(true)
-	s.Call(false)
+	s.Call(true, Route{})
+	s.Call(false, Route{})
 	want := []string{"profile bluez_card.JABRA headset-head-unit", "profile bluez_card.JABRA a2dp-sink", "settle", "output bluez_output.JABRA.1"}
 	if !reflect.DeepEqual(env.log, want) {
 		t.Errorf("log %q, want %q", env.log, want)
@@ -122,8 +122,8 @@ func TestSwitcherNothingToDo(t *testing.T) {
 	// Already in the phone profile and no music: nothing happens at all.
 	env := &fakeEnv{cards: []Card{card("bluez_card.JABRA", "headset-head-unit-cvsd")}}
 	s := &Switcher{Env: env, Settle: func() { t.Error("Settle without players") }}
-	s.Call(true)
-	s.Call(false)
+	s.Call(true, Route{})
+	s.Call(false, Route{})
 	if env.log != nil {
 		t.Errorf("log %q", env.log)
 	}
@@ -133,10 +133,10 @@ func TestSwitcherUserChangedProfile(t *testing.T) {
 	// Profiles the user changed during the call, and headsets gone, stay.
 	env := &fakeEnv{cards: []Card{card("bluez_card.JBL", "a2dp-sink"), card("bluez_card.JABRA", "a2dp-sink-sbc")}}
 	s := &Switcher{Env: env}
-	s.Call(true)
+	s.Call(true, Route{})
 	env.cards = []Card{card("bluez_card.JBL", "a2dp-sink")}
 	env.log = nil
-	s.Call(false)
+	s.Call(false, Route{})
 	if env.log != nil {
 		t.Errorf("log %q", env.log)
 	}
@@ -146,9 +146,9 @@ func TestSwitcherSetFails(t *testing.T) {
 	env := &fakeEnv{cards: []Card{card("bluez_card.JBL", "a2dp-sink")}, failSet: true}
 	var logged []string
 	s := &Switcher{Env: env, Log: func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) }}
-	s.Call(true)
+	s.Call(true, Route{})
 	env.failSet = false
-	s.Call(false)
+	s.Call(false, Route{})
 	if env.log != nil || len(logged) != 1 {
 		t.Errorf("log %q, logged %q", env.log, logged)
 	}
@@ -237,5 +237,58 @@ func TestParseCards(t *testing.T) {
 	}
 	if _, err := ParseCards([]byte("not json"), nil); err == nil {
 		t.Error("bad dump accepted")
+	}
+}
+
+// TestSwitcherRoute: in mode ofono the headset that answers takes the call,
+// even when a Bluetooth speaker is the default output.
+func TestSwitcherRoute(t *testing.T) {
+	const jblAddr = "84:d3:52:8c:b9:d0"
+	jbl, jabra := card(CardName(jblAddr), "a2dp-sink"), card("bluez_card.50_C2_75_0D_4E_03", "a2dp-sink")
+	env := &fakeEnv{cards: []Card{jbl, jabra}, playing: []string{"player"}}
+	s := &Switcher{Env: env}
+
+	// Ringing: pause the music, switch nothing yet.
+	s.Call(true, Route{Wait: true})
+	if want := []string{"pause player"}; !reflect.DeepEqual(env.log, want) {
+		t.Fatalf("ringing: %q, want %q", env.log, want)
+	}
+	// Answered on the JBL.
+	env.log = nil
+	s.Call(true, Route{Device: jblAddr})
+	s.Call(true, Route{Device: jblAddr})
+	if want := []string{"profile bluez_card.84_D3_52_8C_B9_D0 headset-head-unit"}; !reflect.DeepEqual(env.log, want) {
+		t.Fatalf("answered: %q, want %q", env.log, want)
+	}
+	env.log = nil
+	s.Call(false, Route{})
+	if want := []string{"profile bluez_card.84_D3_52_8C_B9_D0 a2dp-sink", "play player"}; !reflect.DeepEqual(env.log, want) {
+		t.Fatalf("end: %q, want %q", env.log, want)
+	}
+}
+
+// TestSwitcherRouteChange: a call taken in the softphone switches both; when
+// a headset then takes it, the other one goes back.
+func TestSwitcherRouteChange(t *testing.T) {
+	jbl, jabra := card("bluez_card.84_D3_52_8C_B9_D0", "a2dp-sink"), card("bluez_card.50_C2_75_0D_4E_03", "a2dp-sink")
+	env := &fakeEnv{cards: []Card{jbl, jabra}}
+	s := &Switcher{Env: env}
+	s.Call(true, Route{})
+	if len(env.log) != 2 {
+		t.Fatalf("no headset known: %q", env.log)
+	}
+	env.log = nil
+	s.Call(true, Route{Device: "50:C2:75:0D:4E:03"})
+	if want := []string{"profile bluez_card.84_D3_52_8C_B9_D0 a2dp-sink"}; !reflect.DeepEqual(env.log, want) {
+		t.Fatalf("route change: %q, want %q", env.log, want)
+	}
+	env.log = nil
+	s.Call(false, Route{})
+	if want := []string{"profile bluez_card.50_C2_75_0D_4E_03 a2dp-sink"}; !reflect.DeepEqual(env.log, want) {
+		t.Fatalf("end: %q, want %q", env.log, want)
+	}
+	// A device that is not connected falls back to the usual choice.
+	if got := forCall([]Card{jbl}, "11:22:33:44:55:66"); len(got) != 1 || got[0].Name != jbl.Name {
+		t.Fatalf("forCall with unknown device = %v", got)
 	}
 }

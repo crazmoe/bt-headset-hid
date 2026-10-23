@@ -52,21 +52,29 @@ func (h headset) gone() {
 	}
 }
 
-func startHeadsets(t *testing.T, all bool) (*headsets, chan bluez.Connection, chan dbus.ObjectPath, chan dbus.ObjectPath) {
-	conns := make(chan bluez.Connection)
-	opened := make(chan dbus.ObjectPath, 4)
-	closed := make(chan dbus.ObjectPath, 4)
-	h := &headsets{
+// startHeadsets serves headsets; the channels receive the device of each
+// onConnected, onClosed and HSP button press.
+func startHeadsets(t *testing.T, all bool) (h *headsets, conns chan bluez.Connection, opened, closed, pressed chan dbus.ObjectPath) {
+	conns = make(chan bluez.Connection)
+	opened = make(chan dbus.ObjectPath, 4)
+	closed = make(chan dbus.ObjectPath, 4)
+	pressed = make(chan dbus.ObjectPath, 4)
+	h = &headsets{
 		bridge: NewBridge(&fakeHID{}), conns: conns, forget: func(dbus.ObjectPath, *os.File) {},
 		// Not t.Logf: sessions end after the test.
 		features: hfp.DefaultFeatures, all: all, logf: func(string, ...any) {},
 		onConnected: func(c bluez.Connection, _ *Session) { opened <- c.Device },
 		onClosed:    func(c bluez.Connection) { closed <- c.Device },
+		onEvent: func(c bluez.Connection, e hfp.Event) {
+			if e.Kind == hfp.Button {
+				pressed <- c.Device
+			}
+		},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	go h.serve(ctx)
-	return h, conns, opened, closed
+	return h, conns, opened, closed, pressed
 }
 
 func expectDevice(t *testing.T, ch chan dbus.ObjectPath, want dbus.ObjectPath) {
@@ -83,7 +91,7 @@ func expectDevice(t *testing.T, ch chan dbus.ObjectPath, want dbus.ObjectPath) {
 
 func TestHeadsetsAll(t *testing.T) {
 	const jabra, jbl = dbus.ObjectPath("/org/bluez/hci0/dev_50_C2_75_0D_4E_03"), dbus.ObjectPath("/org/bluez/hci0/dev_84_D3_52_8C_B9_D0")
-	h, conns, opened, closed := startHeadsets(t, true)
+	h, conns, opened, closed, pressed := startHeadsets(t, true)
 	a := connect(t, conns, jabra)
 	expectDevice(t, opened, jabra)
 	b := connect(t, conns, jbl)
@@ -94,6 +102,11 @@ func TestHeadsetsAll(t *testing.T) {
 	a.expect("RING")
 	b.expect("RING")
 	h.setState(hfp.Idle)
+
+	// Button presses say which headset they come from.
+	b.send("AT+CKPD=200")
+	b.expect("OK")
+	expectDevice(t, pressed, jbl)
 
 	// A reconnect replaces the old connection without closing the card.
 	a2 := connect(t, conns, jabra)
@@ -113,7 +126,7 @@ func TestHeadsetsAll(t *testing.T) {
 
 func TestHeadsetsLatest(t *testing.T) {
 	const jabra, jbl = dbus.ObjectPath("/org/bluez/hci0/dev_50_C2_75_0D_4E_03"), dbus.ObjectPath("/org/bluez/hci0/dev_84_D3_52_8C_B9_D0")
-	h, conns, opened, _ := startHeadsets(t, false)
+	h, conns, opened, _, _ := startHeadsets(t, false)
 	a := connect(t, conns, jabra)
 	expectDevice(t, opened, jabra)
 	b := connect(t, conns, jbl)

@@ -104,8 +104,9 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    achten. Bei `-mode pipewire` und `-mode ofono` spielt das Headset Musik (A2DP). Klingelt es oder rufst du an,
    pausiert der Benutzerdienst `bt-headset-hid-session` laufende Player, schaltet das Headset ins
    Telefonprofil (HFP) und nach dem Gespräch zurück und setzt die Player fort
-   (`journalctl --user -u bt-headset-hid-session -f`). Pausiert wird über MPRIS, das die meisten
-   Player und Browser können. Hast du das Headset erst nach `install` gekoppelt, einmal
+   (`journalctl --user -u bt-headset-hid-session -f`). Bei `-mode ofono` schaltet er erst beim
+   Abnehmen um, und nur das Headset, mit dem du abnimmst; solange es klingelt, piepsen die Headsets
+   selbst. Pausiert wird über MPRIS, das die meisten Player und Browser können. Hast du das Headset erst nach `install` gekoppelt, einmal
    `bt-headset-hid wireplumber` als normaler Benutzer ausführen, damit das und Lautsprecher und
    Mikrofon `bt-headset-hid` dafür gelten.
 
@@ -129,8 +130,9 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   gemeinsamen Namen, `~/.config/systemd/user/bt-headset-hid-session.service` schaltet sie für
   Gespräche ins Telefonprofil, und `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` legt Lautsprecher und Mikrofon
   `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, geht das Gespräch
-  an das, das in den Toneinstellungen als Ausgabe gewählt ist; mit `-profile phone` an das erste,
-  das PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
+  bei `-mode ofono` an das, mit dem du abnimmst oder wählst, sodass die Standardausgabe z. B. ein
+  Bluetooth-Lautsprecher bleiben kann; sonst an das, das in den Toneinstellungen als Ausgabe gewählt
+  ist; mit `-profile phone` an das erste, das PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
   einzurichten, etwa eines fürs Büro und eines für zu Hause, oder zum Wechseln:
   `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Ausserdem schaltet es WirePlumbers eigenen
   Wechsel ins Telefonprofil ab (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), der bei einem

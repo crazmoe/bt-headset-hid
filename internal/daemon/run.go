@@ -154,7 +154,8 @@ func Run(ctx context.Context, cfg Config) error {
 			return err
 		}
 		defer ps.Close()
-		h := &headsets{bridge: b, conns: ps.Connections(), forget: ps.Forget, features: hfp.DefaultFeatures, onEvent: hfpEvent, logf: logf}
+		h := &headsets{bridge: b, conns: ps.Connections(), forget: ps.Forget, features: hfp.DefaultFeatures,
+			onEvent: func(_ bluez.Connection, e hfp.Event) { hfpEvent(e) }, logf: logf}
 		b.OnState(h.setState)
 		go h.serve(ctx)
 		logf("HFP/HSP Audio Gateway registered with BlueZ")
@@ -170,7 +171,16 @@ func Run(ctx context.Context, cfg Config) error {
 			return err
 		}
 		defer ps.Close()
-		h := &headsets{bridge: b, conns: ps.Connections(), forget: ps.Forget, features: features, all: true, onEvent: hfpEvent, logf: logf}
+		// The headset whose button answered or dialled takes the call
+		// audio ("bt-headset-hid session" switches it), until the call ends.
+		onEvent := func(c bluez.Connection, e hfp.Event) {
+			switch e.Kind {
+			case hfp.Answer, hfp.Button, hfp.Redial, hfp.Dial:
+				srv.SetCallDevice(c.Address())
+			}
+			hfpEvent(e)
+		}
+		h := &headsets{bridge: b, conns: ps.Connections(), forget: ps.Forget, features: features, all: true, onEvent: onEvent, logf: logf}
 		h.onConnected = func(c bluez.Connection, sess *Session) {
 			if c.Profile != hfp.HFP {
 				return // PipeWire takes the audio of HFP only
@@ -187,6 +197,9 @@ func Run(ctx context.Context, cfg Config) error {
 		st := &settler{delay: time.Second, set: func(s hfp.CallState) {
 			h.setState(s)
 			srv.SetCallState(s)
+			if s == hfp.Idle {
+				srv.SetCallDevice("")
+			}
 		}}
 		b.OnState(func(s hfp.CallState) {
 			logf("call state: %v", s)
@@ -253,7 +266,7 @@ type headsets struct {
 	// all serves every connected headset; otherwise only the most recently
 	// connected one.
 	all     bool
-	onEvent func(hfp.Event)
+	onEvent func(bluez.Connection, hfp.Event) // button presses and gain changes
 	logf    func(string, ...any)
 	// onConnected runs when a headset can take part in calls, onClosed
 	// when its connection ended; both may be nil.
@@ -296,7 +309,11 @@ func (h *headsets) serve(ctx context.Context) {
 			return
 		case c := <-h.conns:
 			h.logf("headset %s connected (%v)", c.Address(), c.Profile)
-			sess := NewSession(c.File, c.Profile, h.features, h.onEvent, h.logf)
+			var onEvent func(hfp.Event)
+			if h.onEvent != nil {
+				onEvent = func(e hfp.Event) { h.onEvent(c, e) }
+			}
+			sess := NewSession(c.File, c.Profile, h.features, onEvent, h.logf)
 			if h.onConnected != nil {
 				sess.OnConnected(func() { h.onConnected(c, sess) })
 			}

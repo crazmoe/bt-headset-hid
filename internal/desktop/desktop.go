@@ -125,21 +125,26 @@ func (s System) Play(player string) error {
 }
 
 // InCall reports whether the bt-headset-hid daemon on the system bus conn
-// sees a call that rings, is being dialled or is going on. In mode ofono it
-// publishes the call state under the oFono name; in mode pipewire it is the
-// ModemManager modem. Without either there is no call.
-func InCall(conn *dbus.Conn) (bool, error) {
+// sees a call that rings, is being dialled or is going on, and which
+// headsets it needs. In mode ofono the daemon publishes the call state and
+// the headset that took the call under the oFono name; in mode pipewire it is
+// the ModemManager modem, which does not know the headset. Without either
+// there is no call.
+func InCall(conn *dbus.Conn) (bool, callswitch.Route, error) {
 	// Without NoAutoStart the bus would try to start oFono or ModemManager,
 	// and systemd answers that it has no such unit.
 	noOwner := func(err error) bool {
 		e, ok := err.(dbus.Error)
 		return ok && (e.Name == "org.freedesktop.DBus.Error.ServiceUnknown" || e.Name == "org.freedesktop.DBus.Error.NameHasNoOwner")
 	}
-	var st string
+	var status map[string]dbus.Variant
 	err := conn.Object(ofono.Service, ofono.StatusPath).
-		Call("org.freedesktop.DBus.Properties.Get", dbus.FlagNoAutoStart, ofono.StatusIface, "CallState").Store(&st)
-	if err == nil {
-		return st != hfp.Idle.String(), nil
+		Call("org.freedesktop.DBus.Properties.GetAll", dbus.FlagNoAutoStart, ofono.StatusIface).Store(&status)
+	if st, ok := status["CallState"].Value().(string); err == nil && ok {
+		dev, _ := status["CallDevice"].Value().(string)
+		// While it only rings, wait for the headset that answers.
+		r := callswitch.Route{Device: dev, Wait: st == hfp.Incoming.String() && dev == ""}
+		return st != hfp.Idle.String(), r, nil
 	}
 	get := func(path dbus.ObjectPath, iface, prop string) (dbus.Variant, error) {
 		var v dbus.Variant
@@ -150,9 +155,9 @@ func InCall(conn *dbus.Conn) (bool, error) {
 	v, err := get(modem.ModemPath, modem.Service+".Modem.Voice", "Calls")
 	if err != nil {
 		if noOwner(err) {
-			return false, nil
+			return false, callswitch.Route{}, nil
 		}
-		return false, err
+		return false, callswitch.Route{}, err
 	}
 	paths, _ := v.Value().([]dbus.ObjectPath)
 	for _, p := range paths {
@@ -161,10 +166,10 @@ func InCall(conn *dbus.Conn) (bool, error) {
 			continue // the call ended meanwhile
 		}
 		if n, _ := st.Value().(int32); callswitch.Busy(modem.CallState(n)) {
-			return true, nil
+			return true, callswitch.Route{}, nil
 		}
 	}
-	return false, nil
+	return false, callswitch.Route{}, nil
 }
 
 // Watch subscribes conn to the signals of the daemon (as oFono or as the
