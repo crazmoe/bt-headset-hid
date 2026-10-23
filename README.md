@@ -120,7 +120,8 @@ What `install` does, step by step, if you prefer to do it yourself:
 - PipeWire: `bt-headset-hid wireplumber -mode pipewire` (or `-mode hfp`, `-mode ofono`) as your normal user.
   It detects the WirePlumber version, writes the matching file (0.4: Lua in
   `~/.config/wireplumber/bluetooth.lua.d/`, 0.5 and later: `~/.config/wireplumber/wireplumber.conf.d/`),
-  removes the file of the other version and restarts PipeWire; `-remove` undoes it. By hand: copy
+  removes the file of the other version and restarts PipeWire; `-remove` undoes it. Without `-mode`
+  it keeps the mode set up before. By hand: copy
   the matching file from `contrib/wireplumber/` to the path written in its first lines.
   In `-mode pipewire` and `-mode ofono` it also sets up the headsets: a WirePlumber rule
   (`52-bt-headset-hid-headset.lua` or `.conf`) gives their call audio one name,

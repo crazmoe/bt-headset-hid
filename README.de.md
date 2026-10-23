@@ -123,7 +123,7 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   Das erkennt die WirePlumber-Version, schreibt die passende Datei (0.4: Lua in
   `~/.config/wireplumber/bluetooth.lua.d/`, ab 0.5: `~/.config/wireplumber/wireplumber.conf.d/`),
   entfernt die Datei der jeweils anderen Version und startet PipeWire neu; `-remove` macht es
-  rückgängig. Von Hand: die passende Datei aus `contrib/wireplumber/` an den Pfad kopieren, der in
+  rückgängig. Ohne `-mode` bleibt der bisher eingerichtete Modus. Von Hand: die passende Datei aus `contrib/wireplumber/` an den Pfad kopieren, der in
   ihren ersten Zeilen steht. Bei `-mode pipewire` und `-mode ofono` richtet es ausserdem die Headsets ein: Eine
   WirePlumber-Regel (`52-bt-headset-hid-headset.lua` bzw. `.conf`) gibt ihrem Telefon-Audio einen
   gemeinsamen Namen, `~/.config/systemd/user/bt-headset-hid-session.service` schaltet sie für

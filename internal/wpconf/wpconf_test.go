@@ -254,3 +254,21 @@ func TestSessionUnit(t *testing.T) {
 		t.Fatalf("second RemoveSessionUnit = %v, %v", ok, err)
 	}
 }
+
+func TestConfiguredMode(t *testing.T) {
+	dir := t.TempDir()
+	if m := ConfiguredMode(dir); m != "" {
+		t.Fatalf("ConfiguredMode without files = %q", m)
+	}
+	for _, c := range []struct {
+		mode string
+		v    Version
+	}{{"ofono", Version{0, 4}}, {"hfp", Version{0, 5}}, {"pipewire", Version{0, 4}}, {"ofono", Version{0, 5}}} {
+		if _, err := Install(dir, c.mode, c.v); err != nil {
+			t.Fatal(err)
+		}
+		if m := ConfiguredMode(dir); m != c.mode {
+			t.Errorf("after Install(%s, %v): ConfiguredMode = %q", c.mode, c.v, m)
+		}
+	}
+}

@@ -85,6 +85,24 @@ func Install(dir, mode string, v Version) (string, error) {
 	return target, nil
 }
 
+var modeRE = regexp.MustCompile(`^(?:--|#) Mode (pipewire|hfp|ofono),`)
+
+// ConfiguredMode returns the mode of the configuration written before, from
+// its first line, or "" if there is none.
+func ConfiguredMode(dir string) string {
+	a, b := Paths(dir, Version{0, 5})
+	for _, p := range []string{a, b} {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		if m := modeRE.FindSubmatch(data); m != nil {
+			return string(m[1])
+		}
+	}
+	return ""
+}
+
 // Remove deletes the configuration in both formats. It returns the paths
 // that existed.
 func Remove(dir string) ([]string, error) {
