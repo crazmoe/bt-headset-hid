@@ -17,7 +17,7 @@ import (
 )
 
 // version is overridden at release build time with -ldflags "-X main.version=...".
-var version = "0.3.0"
+var version = "0.4.0"
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "wireplumber" || os.Args[1] == "session" || os.Args[1] == "install" || os.Args[1] == "uninstall") {
