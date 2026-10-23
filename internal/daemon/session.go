@@ -3,6 +3,7 @@ package daemon
 import (
 	"errors"
 	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -78,7 +79,9 @@ func (s *Session) Run() error {
 				return err
 			}
 			continue
-		case errors.Is(err, io.EOF):
+		case errors.Is(err, io.EOF), errors.Is(err, os.ErrClosed):
+			// os.ErrClosed: BlueZ asked to disconnect, or a reconnect
+			// replaced this connection.
 			return nil
 		case err != nil:
 			return err
