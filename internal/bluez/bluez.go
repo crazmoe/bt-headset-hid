@@ -64,7 +64,7 @@ func spec(p hfp.Profile, features int) profileSpec {
 // ErrProfileInUse means another program already registered the Audio
 // Gateway profile with BlueZ, usually PipeWire, PulseAudio or oFono.
 var ErrProfileInUse = errors.New("another program (usually PipeWire) already provides the HFP/HSP Audio Gateway; " +
-	"disable it there (\"bt-headset-hid wireplumber\" with the same -mode, see README) or use -mode pipewire")
+	"disable it there (\"bt-headset-hid wireplumber\" with the same -mode, see docs/ADVANCED.md) or use -mode pipewire")
 
 func isAlreadyExists(err error) bool {
 	var e dbus.Error

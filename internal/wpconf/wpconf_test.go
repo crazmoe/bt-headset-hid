@@ -50,7 +50,7 @@ func TestContent(t *testing.T) {
 	}
 }
 
-// The embedded files are copies of contrib/wireplumber, which the README
+// The embedded files are copies of contrib/wireplumber, which docs/ADVANCED.md
 // points to for manual installation.
 func TestFilesMatchContrib(t *testing.T) {
 	entries, err := files.ReadDir("files")

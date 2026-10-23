@@ -133,7 +133,7 @@ switch follows the Off-Hook LED so the next button press toggles correctly.
 
 ## Prerequisites on the host
 
-See the setup section of the [README](../README.md). In short: in mode pipewire, WirePlumber
+See the setup section of [ADVANCED.md](ADVANCED.md). In short: in mode pipewire, WirePlumber
 enables the modem link and ModemManager must not run; in mode hfp, PipeWire must not claim
 HFP/HSP (`bluez5.roles = [ a2dp_sink a2dp_source ]`), otherwise BlueZ refuses the registration;
 in mode ofono, PipeWire uses its oFono backend, which registers nothing with BlueZ, and the real

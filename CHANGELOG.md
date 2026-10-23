@@ -8,6 +8,12 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
+## Unreleased
+
+- The README is now a short guide in three steps for non-technical users; the modes, setup
+  without the package or by hand, troubleshooting and development moved to `docs/ADVANCED.md`
+  (German: `docs/ADVANCED.de.md`), which the packages and tarballs also ship.
+
 ## 0.5.0
 
 - New `bt-headset-hid doctor`: checks the service, Bluetooth, the paired headsets, programs that
