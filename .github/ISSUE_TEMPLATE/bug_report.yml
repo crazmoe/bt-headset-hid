@@ -1,11 +1,11 @@
 name: Bug report
-description: Something does not work as described in the README.
+description: Something does not work as described in the documentation.
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! Please check the troubleshooting section of the README first.
+        Thanks for reporting! Please run `bt-headset-hid doctor` and check the troubleshooting section of docs/ADVANCED.md first.
         English or German is fine. Do not post security problems here, see SECURITY.md.
   - type: textarea
     id: what

@@ -32,6 +32,7 @@ jobs:
               -ldflags "-s -w -X main.version=$version" \
               -o "build/$name/bt-headset-hid" ./cmd/bt-headset-hid
             cp -r LICENSE README.md README.de.md CHANGELOG.md contrib "build/$name/"
+            mkdir "build/$name/docs" && cp docs/ADVANCED.md docs/ADVANCED.de.md "build/$name/docs/"
             tar -C build -czf "dist/$name.tar.gz" "$name"
           done
 

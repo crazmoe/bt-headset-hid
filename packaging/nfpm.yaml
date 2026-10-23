@@ -38,6 +38,10 @@ contents:
     dst: /usr/share/doc/bt-headset-hid/README.md
   - src: README.de.md
     dst: /usr/share/doc/bt-headset-hid/README.de.md
+  - src: docs/ADVANCED.md
+    dst: /usr/share/doc/bt-headset-hid/ADVANCED.md
+  - src: docs/ADVANCED.de.md
+    dst: /usr/share/doc/bt-headset-hid/ADVANCED.de.md
   - src: CHANGELOG.md
     dst: /usr/share/doc/bt-headset-hid/CHANGELOG.md
   - src: LICENSE
