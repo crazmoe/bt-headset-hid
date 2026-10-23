@@ -78,12 +78,19 @@ The deb and rpm packages ship the session as a user unit in `/usr/lib/systemd/us
 for every user (`systemctl --global enable`); `postinst` runs `install -system-only` and starts
 the unit for the users logged in. At its start the session compares the user's WirePlumber mode
 with the mode of the system unit and, if they differ, sets up the user's PipeWire as
-`bt-headset-hid wireplumber` would (in mode hfp it then exits). The daemon needs no restart for
+`bt-headset-hid wireplumber` would (in mode hfp it then only shows the tray icon and runs the checks). The daemon needs no restart for
 that: while PipeWire still holds HFP, its registration fails and systemd starts it again every
 five seconds. `~/.config/bt-headset-hid/off`, written by `wireplumber -remove`, keeps the session
 from doing so. The session also shows desktop notifications (`org.freedesktop.Notifications`):
 when it set up PipeWire or a new headset, and for each new failure of the `doctor` checks, which
 it runs 30 seconds after the start and then every 30 minutes (`doctor.NewFailures`).
+
+The session shows a tray icon: a StatusNotifierItem (`org.kde.StatusNotifierItem`, registered
+with `org.kde.StatusNotifierWatcher`, again whenever that restarts) with a `com.canonical.dbusmenu`
+menu, as KDE, Xfce, Cinnamon, MATE, LXQt, waybar and GNOME with the AppIndicator extension show
+them; without a tray nothing is shown. `tray` builds icon, tooltip and menu from the state (mode,
+paired headsets and which are set up, call, failures of the last check); `desktop.Tray` exports
+it. Ticking a headset in the menu writes the headset list as `-headset` would, without a restart.
 
 Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
 passes an Active that follows Idle on to the modem only after one second, and drops it when
@@ -112,7 +119,8 @@ PipeWire (or, in mode ofono, over HFP) is dropped, in case the headset reported 
 | `daemon` | Wire everything together: `Bridge` (mapping + HID device), `Session` (one headset connection in modes hfp and ofono, including codec negotiation), `Run` | all |
 | `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON; in modes pipewire and ofono also the headset rules, the PipeWire loopbacks for the `bt-headset-hid` speaker and microphone and the user service for `bt-headset-hid session` | files |
 | `callswitch` | During a call: pause playing media players, switch headsets from A2DP to the phone profile, and back afterwards | none (behind an interface) |
-| `desktop` | I/O of `bt-headset-hid session`: `pw-dump`/`wpctl`, MPRIS on the session bus, the call state on the system bus (oFono name or modem) | commands, D-Bus |
+| `desktop` | I/O of `bt-headset-hid session`: `pw-dump`/`wpctl`, MPRIS on the session bus, the call state on the system bus (oFono name or modem), notifications and the tray icon | commands, D-Bus |
+| `tray` | What the tray icon shows: icon, tooltip and menu from the state of the setup | none |
 | `doctor` | `bt-headset-hid doctor`: findings with fixes from the facts gathered by the command (service, files, BlueZ, conflicting programs, PipeWire, WirePlumber configuration, log lines) | none |
 | `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner; the choice of the mode when none is given | files, commands |
 | `dbustest` | Private `dbus-daemon` for tests | process |
