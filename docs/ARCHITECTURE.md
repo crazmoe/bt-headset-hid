@@ -4,7 +4,7 @@ HFP carries both the call audio and the headset buttons, and only one program ca
 The daemon therefore has three modes (`-mode`); all end in the same HID device.
 
 ```
-mode pipewire (default, with call audio)
+mode pipewire (with call audio, answer and hang-up only)
 
 Headset --HFP--> BlueZ --> PipeWire (audio, AT commands)
                                | ATA / AT+CHUP -> Call.Accept / Call.Hangup (D-Bus)
@@ -19,7 +19,7 @@ Headset --HFP/HSP--> BlueZ --RFCOMM fd--> bt-headset-hid: AT parser + HFP AG -->
                                                 ^                                              |
                                                 +------ +CIEV / RING <------ LED reports ------+
 
-mode ofono (all buttons and call audio, ModemManager stays free)
+mode ofono (default: all buttons and call audio, ModemManager stays free)
 
 Headset --HFP/HSP--> BlueZ --RFCOMM fd--> bt-headset-hid: as in mode hfp --> mapping --> /dev/uhid
    ^                                          | as oFono: card per headset, Acquire
@@ -65,7 +65,10 @@ adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting 
 they follow whichever headset is in the phone profile. With two connected, `bt-headset-hid session`
 switches only the one whose node is the default output (`default.audio.sink`), so the call goes
 where the music plays; if neither is, it switches both and WirePlumber takes the first it finds,
-as it does with `-profile phone`. Without `-profile phone` WirePlumber's own switch
+as it does with `-profile phone`. In mode ofono the daemon knows which headset took the call (the
+one whose button answered or dialled, published as `CallDevice`): the session then switches only
+that one, and none while the call only rings (`callswitch.Route`); a call taken in the softphone
+falls back to the default output as above. Without `-profile phone` WirePlumber's own switch
 (`media-role.use-headset-profile` in 0.4, `bluetooth.autoswitch-to-headset-profile` in 0.5) is
 turned off: when a call stream starts it would switch every Bluetooth headset, including ones
 bt-headset-hid does not serve. Their side towards the headset is passive, so the call audio only runs while a program

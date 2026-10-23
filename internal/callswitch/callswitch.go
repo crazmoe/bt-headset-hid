@@ -24,10 +24,35 @@ type Card struct {
 	Default bool
 }
 
-// forCall returns the headsets to switch for a call: the one that is the
-// default output if there is one, so with two connected the call goes where
-// the music plays, otherwise all of them.
-func forCall(cards []Card) []Card {
+// Route tells which headsets a call needs.
+type Route struct {
+	// Device is the Bluetooth address of the headset that took the call
+	// (answered it or dialled from it), if known.
+	Device string
+	// Wait: the call only rings and nobody knows yet which headset will
+	// take it, so none is switched yet.
+	Wait bool
+}
+
+// CardName is the PipeWire device name of the headset with Bluetooth
+// address addr.
+func CardName(addr string) string {
+	return "bluez_card." + strings.ReplaceAll(strings.ToUpper(addr), ":", "_")
+}
+
+// forCall returns the headsets to switch for a call: the one that took it if
+// it is known and connected; else the one that is the default output if
+// there is one, so with two connected the call goes where the music plays;
+// otherwise all of them.
+func forCall(cards []Card, device string) []Card {
+	if device != "" {
+		name := CardName(device)
+		for _, c := range cards {
+			if c.Name == name {
+				return []Card{c}
+			}
+		}
+	}
 	var def []Card
 	for _, c := range cards {
 		if c.Default {
@@ -82,6 +107,7 @@ type Switcher struct {
 	Settle func()
 
 	inCall bool
+	route  Route
 	saved  map[string]string // card name -> profile before the call
 	paused []string
 	output string // default output before the call, if a headset switched
@@ -96,15 +122,22 @@ func (s *Switcher) logf(format string, args ...any) {
 // InCall reports the state of the last Call.
 func (s *Switcher) InCall() bool { return s.inCall }
 
-// Call starts (in) or ends a call. At the start it pauses the media players
-// that play and switches the headsets to the phone profile; at the end it
+// Call starts (in) or ends a call, or changes its route. At the start it
+// pauses the media players that play and switches the headsets the route
+// needs to the phone profile; when the route changes during the call, it
+// switches those and switches back the others it switched; at the end it
 // switches back the headsets it switched and resumes the players it paused.
-func (s *Switcher) Call(in bool) {
+func (s *Switcher) Call(in bool, r Route) {
 	if in == s.inCall {
+		if in && r != s.route {
+			s.route = r
+			s.switchFor(r)
+		}
 		return
 	}
 	s.inCall = in
 	if in {
+		s.route = r
 		s.start()
 	} else {
 		s.end()
@@ -124,10 +157,6 @@ func (s *Switcher) start() {
 		s.logf("paused %s", p)
 		s.paused = append(s.paused, p)
 	}
-	cards, err := s.Env.Cards()
-	if err != nil {
-		s.logf("headsets: %v", err)
-	}
 	// The music output of a headset goes away with its profile, and the
 	// desktop may then choose another default output. Keep the old one.
 	s.output = ""
@@ -137,7 +166,40 @@ func (s *Switcher) start() {
 		s.output = out
 	}
 	s.saved = map[string]string{}
-	for _, c := range forCall(cards) {
+	s.switchFor(s.route)
+}
+
+// switchFor switches the headsets r needs to the phone profile and the ones
+// switched before for this call that r no longer needs back.
+func (s *Switcher) switchFor(r Route) {
+	if r.Wait {
+		return
+	}
+	cards, err := s.Env.Cards()
+	if err != nil {
+		s.logf("headsets: %v", err)
+	}
+	want := forCall(cards, r.Device)
+	needed := map[string]bool{}
+	for _, c := range want {
+		needed[c.Name] = true
+	}
+	for _, c := range cards {
+		old, ok := s.saved[c.Name]
+		if !ok || needed[c.Name] {
+			continue
+		}
+		delete(s.saved, c.Name)
+		if _, ok := c.Profiles[old]; !ok || c.Profile == old {
+			continue
+		}
+		if err := s.Env.SetProfile(c, old); err != nil {
+			s.logf("%s: profile %s: %v", c.Name, old, err)
+			continue
+		}
+		s.logf("%s: %s -> %s (not taking the call)", c.Name, c.Profile, old)
+	}
+	for _, c := range want {
 		if IsPhone(c.Profile) {
 			continue
 		}

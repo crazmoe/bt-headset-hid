@@ -42,7 +42,9 @@ const (
 	errFailed      = Service + ".Error.Failed"
 
 	// StatusPath and StatusIface publish the softphone's call state as the
-	// property CallState: "idle", "incoming", "outgoing" or "active".
+	// property CallState: "idle", "incoming", "outgoing" or "active", and
+	// the address of the headset that took the call as CallDevice ("" if
+	// none did, e.g. when it was answered in the softphone).
 	StatusPath  = dbus.ObjectPath("/bt_headset_hid")
 	StatusIface = "io.github.crazmoe.BtHeadsetHid1"
 )
@@ -101,7 +103,10 @@ func Serve(conn *dbus.Conn, logf func(format string, args ...any)) (*Server, err
 		return nil, err
 	}
 	status, err := prop.Export(conn, StatusPath, prop.Map{
-		StatusIface: {"CallState": {Value: hfp.Idle.String(), Emit: prop.EmitTrue}},
+		StatusIface: {
+			"CallState":  {Value: hfp.Idle.String(), Emit: prop.EmitTrue},
+			"CallDevice": {Value: "", Emit: prop.EmitTrue},
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -126,6 +131,11 @@ func (s *Server) Close() error {
 // SetCallState publishes the softphone's call state.
 func (s *Server) SetCallState(st hfp.CallState) {
 	s.status.SetMust(StatusIface, "CallState", st.String())
+}
+
+// SetCallDevice publishes the headset that took the call, "" for none.
+func (s *Server) SetCallDevice(addr string) {
+	s.status.SetMust(StatusIface, "CallDevice", addr)
 }
 
 // AddCard offers the audio of the headset with the BlueZ device path device.

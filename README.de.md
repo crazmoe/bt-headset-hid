@@ -20,7 +20,7 @@ Siehe [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) für den Aufbau und
 Telefon-Audio und die Headset-Tasten laufen beide über HFP, und nur ein Programm kann HFP
 belegen. Deshalb wählst du:
 
-| | `-mode pipewire` (Standard) | `-mode hfp` | `-mode ofono` (neu) |
+| | `-mode pipewire` | `-mode hfp` | `-mode ofono` (Standard) |
 |---|---|---|---|
 | Wer belegt HFP | PipeWire | bt-headset-hid | bt-headset-hid, PipeWire holt den Ton bei ihm ab |
 | Telefon-Audio (Headset-Mikrofon und -Lautsprecher) | ja, als Lautsprecher und Mikrofon „bt-headset-hid“ | nein (nur A2DP-Musik) | ja, als Lautsprecher und Mikrofon „bt-headset-hid“, in HD-Qualität (mSBC), wo das Headset es kann |
@@ -32,7 +32,13 @@ belegen. Deshalb wählst du:
 | PipeWire-Version | 1.2 oder neuer (oder die Korrektur unten) | beliebig | beliebig, mit oFono-Backend gebaut (Standard) |
 | Funktionsweise | bt-headset-hid gibt sich als ModemManager-Modem aus; PipeWire leitet `ATA`/`AT+CHUP` daran weiter | bt-headset-hid registriert das HFP/HSP Audio Gateway bei BlueZ und wertet die AT-Befehle selbst aus | wie bei `hfp`, und bt-headset-hid gibt sich als oFono aus, sodass PipeWires oFono-Backend den Gesprächston bei ihm abholt |
 
-Nimm `pipewire`, wenn du über das Headset telefonieren willst, so wie mit einem Dongle. Dafür
+Nimm `ofono` (Standard), wenn du über das Headset telefonieren willst, so wie mit einem Dongle:
+bt-headset-hid bedient das Headset wie bei `hfp` und gibt den Gesprächston über die Schnittstelle
+von oFono (`org.ofono`) an PipeWire weiter; oFono selbst wird nicht gebraucht und darf nicht laufen.
+ModemManager läuft weiter, ein Mobilfunkmodem (WWAN) funktioniert also weiterhin, und jede
+PipeWire-Version geht.
+
+`pipewire` war vor `ofono` der Standard und bleibt als Alternative. Dafür
 braucht es **PipeWire 1.2 oder neuer** (`pipewire --version`): Ältere Versionen, z. B. 1.0.x in
 Ubuntu 24.04 und darauf aufbauenden Distributionen, stürzen bei eingehenden Anrufen eines Modems ab,
 das Headset klingelt also nicht und kann nicht abnehmen, und `install` verweigert `-mode pipewire`.
@@ -47,12 +53,6 @@ contrib/pipewire-1.0-fix.sh --restore  # zurück zum Original-Plugin
 Das Skript lädt die Quellen deiner PipeWire-Version, wendet die einzeilige Korrektur aus 1.2.0 an,
 baut nur `libspa-bluez5.so` und ersetzt die installierte Datei. Ein PipeWire-Update deiner
 Distribution überschreibt sie wieder; `install` merkt das und bittet, das Skript erneut auszuführen.
-
-`ofono` ist neu und verbindet beides: bt-headset-hid bedient das Headset wie bei `hfp` und gibt den
-Gesprächston über die Schnittstelle von oFono (`org.ofono`) an PipeWire weiter; oFono selbst wird
-nicht gebraucht und darf nicht laufen. ModemManager läuft weiter, ein Mobilfunkmodem (WWAN)
-funktioniert also weiterhin, und die PipeWire-Korrektur ist nicht nötig. Der Modus ist noch nicht
-so breit getestet wie `pipewire`; bitte melde, wie er mit deinem Headset funktioniert.
 
 ## Einrichtung
 
@@ -104,8 +104,9 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    achten. Bei `-mode pipewire` und `-mode ofono` spielt das Headset Musik (A2DP). Klingelt es oder rufst du an,
    pausiert der Benutzerdienst `bt-headset-hid-session` laufende Player, schaltet das Headset ins
    Telefonprofil (HFP) und nach dem Gespräch zurück und setzt die Player fort
-   (`journalctl --user -u bt-headset-hid-session -f`). Pausiert wird über MPRIS, das die meisten
-   Player und Browser können. Hast du das Headset erst nach `install` gekoppelt, einmal
+   (`journalctl --user -u bt-headset-hid-session -f`). Bei `-mode ofono` schaltet er erst beim
+   Abnehmen um, und nur das Headset, mit dem du abnimmst; solange es klingelt, piepsen die Headsets
+   selbst. Pausiert wird über MPRIS, das die meisten Player und Browser können. Hast du das Headset erst nach `install` gekoppelt, einmal
    `bt-headset-hid wireplumber` als normaler Benutzer ausführen, damit das und Lautsprecher und
    Mikrofon `bt-headset-hid` dafür gelten.
 
@@ -129,8 +130,9 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   gemeinsamen Namen, `~/.config/systemd/user/bt-headset-hid-session.service` schaltet sie für
   Gespräche ins Telefonprofil, und `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` legt Lautsprecher und Mikrofon
   `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, geht das Gespräch
-  an das, das in den Toneinstellungen als Ausgabe gewählt ist; mit `-profile phone` an das erste,
-  das PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
+  bei `-mode ofono` an das, mit dem du abnimmst oder wählst, sodass die Standardausgabe z. B. ein
+  Bluetooth-Lautsprecher bleiben kann; sonst an das, das in den Toneinstellungen als Ausgabe gewählt
+  ist; mit `-profile phone` an das erste, das PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
   einzurichten, etwa eines fürs Büro und eines für zu Hause, oder zum Wechseln:
   `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Ausserdem schaltet es WirePlumbers eigenen
   Wechsel ins Telefonprofil ab (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), der bei einem

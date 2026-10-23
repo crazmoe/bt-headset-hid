@@ -75,8 +75,9 @@ func runSession(args []string) error {
 	defer stop()
 
 	var end <-chan time.Time
+	taken := "" // headset that took the call, if known
 	check := func(final bool) {
-		in, err := desktop.InCall(sys)
+		in, route, err := desktop.InCall(sys)
 		if err != nil {
 			logger.Printf("call state: %v", err)
 			return
@@ -87,11 +88,15 @@ func runSession(args []string) error {
 			if !sw.InCall() {
 				logger.Print("call")
 			}
-			sw.Call(true)
+			if route.Device != "" && route.Device != taken {
+				logger.Printf("call taken on %s", route.Device)
+			}
+			taken = route.Device
+			sw.Call(true, route)
 		case !sw.InCall():
 		case final:
 			logger.Print("call ended")
-			sw.Call(false)
+			sw.Call(false, callswitch.Route{})
 		case end == nil:
 			end = time.After(endDelay)
 		}
@@ -100,11 +105,11 @@ func runSession(args []string) error {
 	for {
 		select {
 		case <-ctx.Done():
-			sw.Call(false)
+			sw.Call(false, callswitch.Route{})
 			return nil
 		case _, ok := <-sigs:
 			if !ok {
-				sw.Call(false)
+				sw.Call(false, callswitch.Route{})
 				return errors.New("system bus closed")
 			}
 			check(false)

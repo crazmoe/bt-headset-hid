@@ -40,14 +40,14 @@ func main() {
 	}
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: bt-headset-hid [flags]")
-		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid install [-mode pipewire|hfp|ofono]   (set up everything)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid install [-mode ofono|pipewire|hfp]   (set up everything)")
 		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid uninstall")
-		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode pipewire|hfp|ofono] [-remove]   (only PipeWire, as your user)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode ofono|pipewire|hfp] [-remove]   (only PipeWire, as your user)")
 		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid session   (user service of modes pipewire and ofono: phone profile during calls)")
 		flag.PrintDefaults()
 	}
-	mode := flag.String("mode", string(daemon.ModePipeWire),
-		`"pipewire": PipeWire keeps HFP and the audio, answer/hang up only; "hfp": all buttons, no call audio; "ofono": all buttons and call audio, ModemManager stays free`)
+	mode := flag.String("mode", string(daemon.ModeOFono),
+		`"ofono": all buttons and call audio, ModemManager stays free; "pipewire": PipeWire keeps HFP and the audio, answer/hang up only; "hfp": all buttons, no call audio`)
 	name := flag.String("name", "bt-headset-hid", "HID device name")
 	vendor := flag.Uint("vendor", daemon.DefaultVendor, "HID vendor ID")
 	product := flag.Uint("product", daemon.DefaultProduct, "HID product ID")

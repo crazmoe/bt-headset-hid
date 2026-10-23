@@ -142,6 +142,11 @@ func TestServer(t *testing.T) {
 		t.Fatalf("CallState = %q, %v", st, err)
 	}
 
+	srv.SetCallDevice("84:D3:52:8C:B9:D0")
+	if err := pw.Object(Service, StatusPath).Call("org.freedesktop.DBus.Properties.Get", 0, StatusIface, "CallDevice").Store(&st); err != nil || st != "84:D3:52:8C:B9:D0" {
+		t.Fatalf("CallDevice = %q, %v", st, err)
+	}
+
 	if err := srv.RemoveCard(device); err != nil {
 		t.Fatal(err)
 	}

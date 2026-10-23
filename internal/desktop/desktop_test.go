@@ -7,6 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/crazmoe/bt-headset-hid/internal/callswitch"
 	"github.com/crazmoe/bt-headset-hid/internal/dbustest"
 	"github.com/crazmoe/bt-headset-hid/internal/hfp"
 	"github.com/crazmoe/bt-headset-hid/internal/modem"
@@ -21,7 +22,7 @@ func TestInCall(t *testing.T) {
 	if err := Watch(watcher); err != nil {
 		t.Fatal(err)
 	}
-	if in, err := InCall(watcher); in || err != nil {
+	if in, _, err := InCall(watcher); in || err != nil {
 		t.Fatalf("InCall without modem = %v, %v", in, err)
 	}
 
@@ -38,7 +39,7 @@ func TestInCall(t *testing.T) {
 			t.Fatal(err)
 		}
 		waitSignal(t, sigs)
-		if in, err := InCall(watcher); in != step.want || err != nil {
+		if in, _, err := InCall(watcher); in != step.want || err != nil {
 			t.Fatalf("after %v: InCall = %v, %v", step.state, in, err)
 		}
 	}
@@ -46,7 +47,7 @@ func TestInCall(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitSignal(t, sigs)
-	if in, err := InCall(watcher); in || err != nil {
+	if in, _, err := InCall(watcher); in || err != nil {
 		t.Fatalf("InCall after the modem left = %v, %v", in, err)
 	}
 }
@@ -66,16 +67,29 @@ func TestInCallOFono(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitSignal(t, sigs)
-	if in, err := InCall(watcher); in || err != nil {
+	if in, _, err := InCall(watcher); in || err != nil {
 		t.Fatalf("InCall when idle = %v, %v", in, err)
 	}
+	// Ringing: wait for the headset that answers; then it takes the call.
+	srv.SetCallState(hfp.Incoming)
+	waitSignal(t, sigs)
+	if in, r, err := InCall(watcher); !in || r != (callswitch.Route{Wait: true}) || err != nil {
+		t.Fatalf("ringing: InCall = %v, %+v, %v", in, r, err)
+	}
+	srv.SetCallDevice("84:D3:52:8C:B9:D0")
+	srv.SetCallState(hfp.Active)
+	waitSignal(t, sigs)
+	if in, r, err := InCall(watcher); !in || r != (callswitch.Route{Device: "84:D3:52:8C:B9:D0"}) || err != nil {
+		t.Fatalf("answered: InCall = %v, %+v, %v", in, r, err)
+	}
+	srv.SetCallDevice("")
 	for _, step := range []struct {
 		state hfp.CallState
 		want  bool
 	}{{hfp.Incoming, true}, {hfp.Outgoing, true}, {hfp.Active, true}, {hfp.Idle, false}} {
 		srv.SetCallState(step.state)
 		waitSignal(t, sigs)
-		if in, err := InCall(watcher); in != step.want || err != nil {
+		if in, _, err := InCall(watcher); in != step.want || err != nil {
 			t.Fatalf("after %v: InCall = %v, %v", step.state, in, err)
 		}
 	}
