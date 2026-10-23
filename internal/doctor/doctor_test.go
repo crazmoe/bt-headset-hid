@@ -189,3 +189,55 @@ func TestNewFailures(t *testing.T) {
 		t.Fatalf("back again: %+v", fresh)
 	}
 }
+
+func TestCopies(t *testing.T) {
+	const old = "/usr/local/bin/bt-headset-hid"
+	pkg := install.PackagedBinary
+	cases := []struct {
+		name      string
+		packaged  bool
+		programs  []string
+		unit      string
+		text, fix string
+	}{
+		{"package only", true, []string{pkg}, pkg, "", ""},
+		{"copy after the package", true, []string{pkg, old}, pkg, "", ""},
+		{"without package", false, []string{old}, old, "", ""},
+		{"copy first", true, []string{old, pkg}, pkg,
+			"an older copy (" + old + ") hides the package, bt-headset-hid commands run it", "sudo rm " + old + " && hash -r"},
+		{"service starts the copy", true, []string{old, pkg}, old,
+			"the service starts an older copy (" + old + ") instead of the package", "sudo rm " + old + " && hash -r && sudo bt-headset-hid install"},
+		{"service only", true, []string{pkg}, old,
+			"the service starts an older copy (" + old + ") instead of the package", "sudo rm " + old + " && hash -r && sudo bt-headset-hid install"},
+	}
+	for _, c := range cases {
+		f := healthy()
+		f.Packaged, f.Programs, f.UnitProgram = c.packaged, c.programs, c.unit
+		var got *Finding
+		for _, fd := range Check(f, false) {
+			if strings.Contains(fd.Text, "older copy") {
+				got = &fd
+			}
+		}
+		switch {
+		case c.text == "" && got != nil:
+			t.Errorf("%s: unexpected %+v", c.name, *got)
+		case c.text != "" && got == nil:
+			t.Errorf("%s: no finding", c.name)
+		case got != nil && (got.Level != Fail || got.Text != c.text || got.Fix != c.fix):
+			t.Errorf("%s: %+v", c.name, *got)
+		}
+	}
+}
+
+func TestProgramFromUnit(t *testing.T) {
+	for unit, want := range map[string]string{
+		string(install.UnitFile("/usr/bin/bt-headset-hid", "pipewire")):   "/usr/bin/bt-headset-hid",
+		"[Service]\nExecStart=-/usr/local/bin/bt-headset-hid -mode hfp\n": "/usr/local/bin/bt-headset-hid",
+		"[Service]\n": "",
+	} {
+		if got := ProgramFromUnit([]byte(unit)); got != want {
+			t.Errorf("ProgramFromUnit(%q) = %q, want %q", unit, got, want)
+		}
+	}
+}

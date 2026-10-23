@@ -69,7 +69,7 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    bt-headset-hid doctor
    ```
 
-   It checks the service, Bluetooth, the paired headsets, programs that get in the way (oFono,
+   It checks the service, older copies of the program that hide the package, Bluetooth, the paired headsets, programs that get in the way (oFono,
    ModemManager, PulseAudio), PipeWire and your WirePlumber configuration, and prints the command
    that fixes each problem it finds (in German if your desktop is set to German). The user service
    runs the same checks now and then and shows a desktop notification for each new problem, with

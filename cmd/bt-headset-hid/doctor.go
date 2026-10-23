@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -94,7 +95,13 @@ func gatherFacts() doctor.Facts {
 	f := doctor.Facts{Root: os.Geteuid() == 0, Adapter: -1, OFonoBackend: -1}
 	if unit, err := os.ReadFile(install.Unit); err == nil {
 		f.Mode = doctor.ModeFromUnit(unit)
+		if p := doctor.ProgramFromUnit(unit); p != "" {
+			f.UnitProgram = resolve(p)
+		}
 	}
+	_, err := os.Stat(install.PackagedBinary)
+	f.Packaged = err == nil
+	f.Programs = programs(os.Getenv("PATH"))
 	if f.Mode == "" {
 		return f
 	}
@@ -103,7 +110,7 @@ func gatherFacts() doctor.Facts {
 		f.LogReadable = true
 		f.Log = doctor.LastStart(strings.Split(strings.TrimSpace(string(out)), "\n"))
 	}
-	_, err := os.Stat("/dev/uhid")
+	_, err = os.Stat("/dev/uhid")
 	f.UHID = err == nil
 	_, err = os.Stat(install.UdevRule)
 	f.UdevRule = err == nil
@@ -152,6 +159,36 @@ func gatherFacts() doctor.Facts {
 		f.OldRules = wpconf.OldRules(dir)
 	}
 	return f
+}
+
+// resolve returns p with symlinks resolved, or p if that fails.
+func resolve(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
+}
+
+// programs returns the programs bt-headset-hid on path, in the order the
+// shell finds them, symlinks resolved, each once.
+func programs(path string) []string {
+	if path == "" {
+		path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	}
+	var out []string
+	for _, dir := range filepath.SplitList(path) {
+		if dir == "" {
+			continue
+		}
+		p := filepath.Join(dir, "bt-headset-hid")
+		if fi, err := os.Stat(p); err != nil || fi.IsDir() || fi.Mode()&0o111 == 0 {
+			continue
+		}
+		if r := resolve(p); !slices.Contains(out, r) {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // adapterState returns 0 without a Bluetooth adapter, 1 if all are off, 2
