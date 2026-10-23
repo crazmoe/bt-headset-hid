@@ -33,7 +33,7 @@ func TestShow(t *testing.T) {
 		{Address: "BB:BB:BB:BB:BB:BB", Name: "", Selected: false},
 	}
 	v := Show(State{Version: "0.6.0", Mode: "ofono", Headsets: hs})
-	if v.Icon != "audio-headset" || v.Attention || v.Tooltip != "Jabra connected" {
+	if v.Icon != "audio-headset-symbolic" || v.Attention || v.Tooltip != "Jabra connected" {
 		t.Errorf("view = %+v", v)
 	}
 	want := []string{
@@ -65,13 +65,13 @@ func TestShowStates(t *testing.T) {
 		s         State
 		icon, tip string
 	}{
-		{"not selected", State{Mode: "ofono", Headsets: hs}, "audio-headset", "no headset connected"},
-		{"hfp uses all", State{Mode: "hfp", Headsets: hs}, "audio-headset", "Jabra connected"},
-		{"call", State{Mode: "ofono", InCall: true}, "call-start", "Call"},
-		{"german", State{Mode: "ofono", German: true}, "audio-headset", "kein Headset verbunden"},
+		{"not selected", State{Mode: "ofono", Headsets: hs}, "audio-headset-symbolic", "no headset connected"},
+		{"hfp uses all", State{Mode: "hfp", Headsets: hs}, "audio-headset-symbolic", "Jabra connected"},
+		{"call", State{Mode: "ofono", InCall: true}, "call-start-symbolic", "Call"},
+		{"german", State{Mode: "ofono", German: true}, "audio-headset-symbolic", "kein Headset verbunden"},
 		{"problem", State{Mode: "ofono", InCall: true, Problems: []doctor.Finding{{Level: doctor.Fail, Text: "Bluetooth is switched off"}}},
-			"dialog-warning", "Bluetooth is switched off"},
-		{"problems", State{Mode: "ofono", Problems: make([]doctor.Finding, 2)}, "dialog-warning", "2 problems, see the menu"},
+			"dialog-warning-symbolic", "Bluetooth is switched off"},
+		{"problems", State{Mode: "ofono", Problems: make([]doctor.Finding, 2)}, "dialog-warning-symbolic", "2 problems, see the menu"},
 	}
 	for _, c := range cases {
 		v := Show(c.s)

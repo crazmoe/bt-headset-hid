@@ -55,7 +55,7 @@ type pixmap struct {
 // called with the ID of a clicked menu item, from another goroutine.
 func NewTray(conn *dbus.Conn, click func(id int32)) (*Tray, error) {
 	t := &Tray{conn: conn, name: fmt.Sprintf("org.kde.StatusNotifierItem-%d-1", os.Getpid()), click: click}
-	t.view = tray.View{Icon: "audio-headset", Title: "bt-headset-hid"}
+	t.view = tray.View{Icon: "audio-headset-symbolic", Title: "bt-headset-hid"}
 	props, err := prop.Export(conn, sniPath, prop.Map{
 		sniIface: {
 			"Category":            {Value: "Hardware"},
@@ -66,7 +66,7 @@ func NewTray(conn *dbus.Conn, click func(id int32)) (*Tray, error) {
 			"IconName":            {Value: t.view.Icon},
 			"IconThemePath":       {Value: ""},
 			"OverlayIconName":     {Value: ""},
-			"AttentionIconName":   {Value: "dialog-warning"},
+			"AttentionIconName":   {Value: "dialog-warning-symbolic"},
 			"AttentionMovieName":  {Value: ""},
 			"ToolTip":             {Value: toolTip{Title: t.view.Title}},
 			"ItemIsMenu":          {Value: true},

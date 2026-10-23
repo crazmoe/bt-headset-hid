@@ -62,7 +62,7 @@ type Item struct {
 
 // View is the icon, title, tooltip and menu for a state.
 type View struct {
-	Icon      string // icon name from the icon theme
+	Icon      string // icon name from the icon theme; symbolic, so trays size it like their other icons
 	Title     string
 	Tooltip   string
 	Attention bool // a problem needs the user
@@ -87,7 +87,7 @@ func (h Headset) name() string {
 // Show builds the view of s.
 func Show(s State) View {
 	de := s.German
-	v := View{Icon: "audio-headset", Title: "bt-headset-hid"}
+	v := View{Icon: "audio-headset-symbolic", Title: "bt-headset-hid"}
 	var connected []string
 	for _, h := range s.Headsets {
 		if h.Connected && (h.Selected || s.Mode == "hfp") {
@@ -96,14 +96,14 @@ func Show(s State) View {
 	}
 	switch {
 	case len(s.Problems) > 0:
-		v.Icon, v.Attention = "dialog-warning", true
+		v.Icon, v.Attention = "dialog-warning-symbolic", true
 		if len(s.Problems) == 1 {
 			v.Tooltip = s.Problems[0].Text
 		} else {
 			v.Tooltip = fmt.Sprintf(t(de, "%d Probleme, siehe Menü", "%d problems, see the menu"), len(s.Problems))
 		}
 	case s.InCall:
-		v.Icon = "call-start"
+		v.Icon = "call-start-symbolic"
 		v.Tooltip = t(de, "Anruf", "Call")
 	case len(connected) > 0:
 		v.Tooltip = strings.Join(connected, ", ") + t(de, " verbunden", " connected")
