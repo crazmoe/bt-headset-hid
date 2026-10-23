@@ -77,7 +77,17 @@ jobs:
           sed -i 's|^gpgkey=.*|gpgkey=https://crazmoe.github.io/bt-headset-hid/key.asc|' site/rpm/bt-headset-hid.repo
 
       - name: Start page
-        run: cp packaging/repo/index.html site/
+        run: |
+          set -eu
+          # The packages, newest first, where the page says <!-- packages -->.
+          links() {
+            (cd "site/$1" && ls -- *."$2" | sort -V -r | sed "s|.*|<li><a href=\"$1/&\">&</a></li>|")
+          }
+          {
+            printf '<p>deb (Debian, Ubuntu):</p>\n<ul>\n'; links apt deb; printf '</ul>\n'
+            printf '<p>rpm (Fedora, openSUSE):</p>\n<ul>\n'; links rpm rpm; printf '</ul>\n'
+          } > packages.html
+          sed -e '/<!-- packages -->/{r packages.html' -e 'd}' packaging/repo/index.html > site/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
