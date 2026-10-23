@@ -8,7 +8,7 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
-## Unreleased
+## 0.4.0
 
 - New mode `ofono`: bt-headset-hid handles the headset itself as in mode hfp (all buttons,
   including redial and volume) and poses as oFono, so PipeWire's oFono backend fetches the call
