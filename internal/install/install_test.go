@@ -32,8 +32,8 @@ func TestFilesMatchContrib(t *testing.T) {
 		}
 	}
 	b, err := os.ReadFile("../../contrib/systemd/bt-headset-hid.service")
-	if err != nil || !bytes.Equal(b, UnitFile(Binary, "pipewire")) {
-		t.Errorf("contrib unit differs from UnitFile(pipewire) (%v)", err)
+	if err != nil || !bytes.Equal(b, UnitFile(Binary, "ofono")) {
+		t.Errorf("contrib unit differs from UnitFile(ofono) (%v)", err)
 	}
 }
 

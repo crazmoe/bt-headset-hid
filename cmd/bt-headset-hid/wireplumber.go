@@ -22,13 +22,13 @@ import (
 // restarts the user's PipeWire session.
 func runWirePlumber(args []string) error {
 	fs := flag.NewFlagSet("wireplumber", flag.ContinueOnError)
-	mode := fs.String("mode", "", `mode the daemon runs in: "pipewire", "hfp" or "ofono" (default: as before, else pipewire)`)
+	mode := fs.String("mode", "", `mode the daemon runs in: "ofono", "pipewire" or "hfp" (default: as before, else ofono)`)
 	remove := fs.Bool("remove", false, "remove the configuration instead")
 	noRestart := fs.Bool("no-restart", false, "do not restart WirePlumber and PipeWire")
 	profile := fs.String("profile", "", `-mode pipewire and ofono: "switch" plays music (A2DP) on the headsets and switches them to the phone profile for calls, pausing media players; "phone" keeps them in the phone profile (default: as before, else switch)`)
 	headset := fs.String("headset", "", `-mode pipewire and ofono: Bluetooth addresses of the headsets, comma-separated, for the phone profile and the "bt-headset-hid" speaker and microphone (default: as before, else the paired headset)`)
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode pipewire|hfp|ofono] [-headset XX:XX:XX:XX:XX:XX[,...]] [-profile switch|phone] [-remove] [-no-restart]")
+		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode ofono|pipewire|hfp] [-headset XX:XX:XX:XX:XX:XX[,...]] [-profile switch|phone] [-remove] [-no-restart]")
 		fmt.Fprintln(fs.Output(), "Run as your normal user, not with sudo.")
 		fs.PrintDefaults()
 	}
@@ -44,7 +44,7 @@ func runWirePlumber(args []string) error {
 	}
 	if *mode == "" {
 		if *mode = wpconf.ConfiguredMode(dir); *mode == "" {
-			*mode = "pipewire"
+			*mode = "ofono"
 		}
 	}
 

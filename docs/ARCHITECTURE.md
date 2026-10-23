@@ -4,7 +4,7 @@ HFP carries both the call audio and the headset buttons, and only one program ca
 The daemon therefore has three modes (`-mode`); all end in the same HID device.
 
 ```
-mode pipewire (default, with call audio)
+mode pipewire (with call audio, answer and hang-up only)
 
 Headset --HFP--> BlueZ --> PipeWire (audio, AT commands)
                                | ATA / AT+CHUP -> Call.Accept / Call.Hangup (D-Bus)
@@ -19,7 +19,7 @@ Headset --HFP/HSP--> BlueZ --RFCOMM fd--> bt-headset-hid: AT parser + HFP AG -->
                                                 ^                                              |
                                                 +------ +CIEV / RING <------ LED reports ------+
 
-mode ofono (all buttons and call audio, ModemManager stays free)
+mode ofono (default: all buttons and call audio, ModemManager stays free)
 
 Headset --HFP/HSP--> BlueZ --RFCOMM fd--> bt-headset-hid: as in mode hfp --> mapping --> /dev/uhid
    ^                                          | as oFono: card per headset, Acquire

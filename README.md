@@ -20,7 +20,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and
 Telephone audio and the headset buttons both travel over HFP, and only one program can own
 HFP. So you choose:
 
-| | `-mode pipewire` (default) | `-mode hfp` | `-mode ofono` (new) |
+| | `-mode pipewire` | `-mode hfp` | `-mode ofono` (default) |
 |---|---|---|---|
 | Who owns HFP | PipeWire | bt-headset-hid | bt-headset-hid, PipeWire takes the audio from it |
 | Call audio (headset mic and speaker) | yes, as speaker and microphone "bt-headset-hid" | no (A2DP music only) | yes, as speaker and microphone "bt-headset-hid", wideband (mSBC) where the headset can |
@@ -32,7 +32,12 @@ HFP. So you choose:
 | PipeWire version | 1.2 or later (or the fix below) | any | any built with the oFono backend (the default) |
 | How it works | bt-headset-hid poses as a ModemManager modem; PipeWire forwards `ATA`/`AT+CHUP` to it | bt-headset-hid registers the HFP/HSP Audio Gateway with BlueZ and parses the AT commands itself | as in `hfp`, and bt-headset-hid poses as oFono, so PipeWire's oFono backend fetches the call audio from it |
 
-Use `pipewire` if you want to talk through the headset, which is what a dongle does. It needs
+Use `ofono` (the default) if you want to talk through the headset, which is what a dongle does:
+bt-headset-hid handles the headset like in `hfp` and hands the call audio to PipeWire through
+oFono's interface (`org.ofono`; oFono itself is not needed and must not run). ModemManager keeps
+running, so a mobile broadband modem (WWAN) keeps working, and any PipeWire version works.
+
+`pipewire` was the default before `ofono` and stays as an alternative. It needs
 **PipeWire 1.2 or later** (`pipewire --version`): older versions, e.g. 1.0.x in Ubuntu 24.04 and
 distributions based on it, crash on incoming calls from a modem, so the headset neither rings nor
 answers, and `install` refuses `-mode pipewire`. There use `ofono` or `hfp`, a newer PipeWire, or fix
@@ -46,12 +51,6 @@ contrib/pipewire-1.0-fix.sh --restore  # back to the original plugin
 The script downloads the sources of your PipeWire version, applies the one-line fix from 1.2.0,
 builds only `libspa-bluez5.so` and replaces the installed file. A PipeWire update from your
 distribution overwrites it again; `install` notices that and asks you to rerun the script.
-
-`ofono` is new and combines the two: bt-headset-hid handles the headset like in `hfp` and hands
-the call audio to PipeWire through oFono's interface (`org.ofono`; oFono itself is not needed and
-must not run). ModemManager keeps running, so a mobile broadband modem (WWAN) keeps working, and
-it does not need the PipeWire fix. It is not yet tested as widely as `pipewire`; please report
-how it works with your headset.
 
 ## Setup
 

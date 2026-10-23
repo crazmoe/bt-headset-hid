@@ -23,13 +23,13 @@ func runInstall(args []string, uninstall bool) error {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	mode := ""
 	if !uninstall {
-		fs.StringVar(&mode, "mode", "", `"pipewire": PipeWire keeps HFP and the audio; "hfp": all buttons, no call audio; "ofono": all buttons and call audio, ModemManager stays free (asked if not given)`)
+		fs.StringVar(&mode, "mode", "", `"ofono": all buttons and call audio, ModemManager stays free; "pipewire": PipeWire keeps HFP and the audio; "hfp": all buttons, no call audio (asked if not given)`)
 	}
 	fs.Usage = func() {
 		if uninstall {
 			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid uninstall")
 		} else {
-			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid install [-mode pipewire|hfp|ofono]")
+			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid install [-mode ofono|pipewire|hfp]")
 		}
 		fs.PrintDefaults()
 	}
@@ -95,27 +95,27 @@ func runInstall(args []string, uninstall bool) error {
 // askMode asks for the mode on the terminal.
 func askMode(in io.Reader) (string, error) {
 	fmt.Println("Which mode?")
-	fmt.Println("  1) pipewire: talk through the headset; answer and hang up work (recommended)")
-	fmt.Println("  2) hfp:      all buttons (redial, volume) work, but no call audio through the headset")
-	fmt.Println("  3) ofono:    talk through the headset with all buttons; mobile broadband (ModemManager) keeps working (new)")
+	fmt.Println("  1) ofono:    talk through the headset with all buttons; mobile broadband (ModemManager) keeps working (recommended)")
+	fmt.Println("  2) pipewire: talk through the headset; only answer and hang up work; ModemManager is switched off")
+	fmt.Println("  3) hfp:      all buttons (redial, volume) work, but no call audio through the headset")
 	r := bufio.NewReader(in)
 	for {
 		fmt.Print("Choose 1, 2 or 3 [1]: ")
 		line, err := r.ReadString('\n')
 		answer := strings.TrimSpace(line)
 		if err != nil && answer == "" {
-			return "", errors.New("no mode chosen; use -mode pipewire, hfp or ofono")
+			return "", errors.New("no mode chosen; use -mode ofono, pipewire or hfp")
 		}
 		switch answer {
-		case "", "1", "pipewire":
-			return "pipewire", nil
-		case "2", "hfp":
-			return "hfp", nil
-		case "3", "ofono":
+		case "", "1", "ofono":
 			return "ofono", nil
+		case "2", "pipewire":
+			return "pipewire", nil
+		case "3", "hfp":
+			return "hfp", nil
 		}
 		if err != nil {
-			return "", errors.New("no mode chosen; use -mode pipewire, hfp or ofono")
+			return "", errors.New("no mode chosen; use -mode ofono, pipewire or hfp")
 		}
 	}
 }
