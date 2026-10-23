@@ -4,37 +4,31 @@
 all releases and publishes it on GitHub Pages at <https://crazmoe.github.io/bt-headset-hid/>. It
 runs after each release and by hand (Actions, "Package repository", "Run workflow").
 
-Once `packaging/repo-key.asc` exists, the packages built by `release.yml` add the repository
-themselves (`/etc/apt/sources.list.d/bt-headset-hid.sources` or
+The packages built by `release.yml` add the repository themselves (`/etc/apt/sources.list.d/bt-headset-hid.sources` or
 `/etc/yum.repos.d/bt-headset-hid.repo`, key in `/usr/share/keyrings/bt-headset-hid.asc`), so
-whoever installs a package gets later versions with the system updates. Without the file the
-packages are built as before.
+whoever installs a package gets later versions with the system updates.
 
-## Setting it up (once)
+## Replacing the key
 
-1. Create a signing key without a passphrase, on any computer with GnuPG:
+The repository is signed with the key in the secret `REPO_SIGNING_KEY` (Settings, Secrets and
+variables, Actions); its public part is `packaging/repo-key.asc`. To replace it, create a new key
+without a passphrase:
 
-   ```
-   export GNUPGHOME=$(mktemp -d)
-   gpg --batch --passphrase '' --quick-gen-key "bt-headset-hid package repository" rsa4096 sign never
-   gpg --armor --export-secret-keys > repo-signing-key.asc
-   gpg --armor --export > repo-key.asc
-   ```
+```
+export GNUPGHOME=$(mktemp -d)
+gpg --batch --passphrase '' --quick-gen-key "bt-headset-hid package repository" rsa4096 sign never
+gpg --armor --export-secret-keys > repo-signing-key.asc
+gpg --armor --export > repo-key.asc
+```
 
-2. In the repository settings, under Secrets and variables, Actions, add the secret
-   `REPO_SIGNING_KEY` with the contents of `repo-signing-key.asc`. Then delete that file and the
-   `GNUPGHOME` folder; a backup of the key in a password manager lets you replace the secret later.
-
-3. Commit `repo-key.asc` as `packaging/repo-key.asc`.
-
-4. In the repository settings, under Pages, choose "GitHub Actions" as the source.
-
-5. Run the workflow "Package repository" once by hand. From the next release on, the packages
-   add the repository.
+Put `repo-signing-key.asc` into the secret, commit `repo-key.asc` as `packaging/repo-key.asc`,
+then delete both files and the `GNUPGHOME` folder and run the workflow by hand. Installed
+packages keep the old key until they are updated, so they cannot update across the change:
+their users add the repository by hand once, as below.
 
 ## Adding it by hand
 
-For packages built before the key existed:
+For packages of 0.4.0 and earlier, or after the key was replaced:
 
 ```
 # Debian, Ubuntu

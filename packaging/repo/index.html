@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bt-headset-hid packages</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #1f2328; background: #fff; }
+  pre { background: #f6f8fa; padding: .75rem; overflow-x: auto; border-radius: 6px; }
+  @media (prefers-color-scheme: dark) { body { color: #e6edf3; background: #0d1117; } pre { background: #161b22; } a { color: #58a6ff; } }
+</style>
+</head>
+<body>
+<h1>bt-headset-hid packages</h1>
+<p>Package repository of <a href="https://github.com/crazmoe/bt-headset-hid">bt-headset-hid</a>.
+The packages from the <a href="https://github.com/crazmoe/bt-headset-hid/releases">releases page</a>
+add it by themselves, so later versions come with the system updates. To add it by hand:</p>
+
+<h2>Debian, Ubuntu</h2>
+<pre>sudo curl -fsSLo /usr/share/keyrings/bt-headset-hid.asc https://crazmoe.github.io/bt-headset-hid/key.asc
+printf 'Types: deb\nURIs: https://crazmoe.github.io/bt-headset-hid/apt/\nSuites: ./\nSigned-By: /usr/share/keyrings/bt-headset-hid.asc\n' |
+  sudo tee /etc/apt/sources.list.d/bt-headset-hid.sources
+sudo apt update &amp;&amp; sudo apt install bt-headset-hid</pre>
+
+<h2>Fedora</h2>
+<pre>sudo curl -fsSLo /etc/yum.repos.d/bt-headset-hid.repo https://crazmoe.github.io/bt-headset-hid/rpm/bt-headset-hid.repo
+sudo dnf install bt-headset-hid</pre>
+
+<p>Signing key: <a href="key.asc">key.asc</a>. Afterwards, check the setup as your normal user:
+<code>bt-headset-hid doctor</code></p>
+</body>
+</html>
