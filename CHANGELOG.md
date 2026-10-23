@@ -16,6 +16,8 @@ version and the output of `journalctl -u bt-headset-hid`, as a
   running, so mobile broadband (WWAN) works next to bt-headset-hid, and PipeWire 1.0 needs no
   fix. Several headsets can be connected at once. `install -mode ofono` sets it up and starts
   ModemManager again if mode pipewire had stopped it.
+- Modes hfp and ofono: BlueZ now also connects HFP to the headset itself, for headsets that
+  wait for the computer instead of connecting HFP on their own.
 
 ## 0.3.0
 

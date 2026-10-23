@@ -140,8 +140,11 @@ func Register(conn *dbus.Conn, features int, profiles ...hfp.Profile) (*Profiles
 			return nil, err
 		}
 		opts := map[string]dbus.Variant{
-			"Name":                  dbus.MakeVariant(sp.name),
-			"Role":                  dbus.MakeVariant("server"),
+			"Name": dbus.MakeVariant(sp.name),
+			// No "Role": BlueZ then both accepts the headset's connection
+			// and connects to it itself, as for PipeWire's profile. With
+			// "server" only, BlueZ ignores AutoConnect, and a headset that
+			// waits for the computer to connect HFP never gets it.
 			"Channel":               dbus.MakeVariant(sp.channel),
 			"RequireAuthentication": dbus.MakeVariant(true),
 			"RequireAuthorization":  dbus.MakeVariant(false),

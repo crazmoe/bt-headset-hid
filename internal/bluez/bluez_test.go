@@ -82,7 +82,7 @@ func TestRegisterAndConnect(t *testing.T) {
 		t.Fatalf("registered %v", mgr.registered)
 	}
 	opts := mgr.opts[hfpPath]
-	if opts["Role"].Value() != "server" || opts["Channel"].Value() != uint16(13) ||
+	if _, ok := opts["Role"]; ok || opts["Channel"].Value() != uint16(13) ||
 		opts["Features"].Value() != uint16(hfp.DefaultFeatures&0x1f) {
 		t.Errorf("HFP options %v", opts)
 	}
