@@ -76,6 +76,9 @@ jobs:
           cp packaging/repo/bt-headset-hid.repo site/rpm/
           sed -i 's|^gpgkey=.*|gpgkey=https://crazmoe.github.io/bt-headset-hid/key.asc|' site/rpm/bt-headset-hid.repo
 
+      - name: Start page
+        run: cp packaging/repo/index.html site/
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
