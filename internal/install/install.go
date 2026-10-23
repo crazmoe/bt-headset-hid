@@ -90,6 +90,17 @@ WantedBy=multi-user.target
 `)
 }
 
+// Policy returns the D-Bus policy that mode needs, or nil if it needs none.
+func Policy(mode string) []byte {
+	switch mode {
+	case "pipewire":
+		return asset("bt-headset-hid.conf")
+	case "ofono":
+		return asset("bt-headset-hid-ofono.conf")
+	}
+	return nil
+}
+
 func asset(name string) []byte {
 	b, err := files.ReadFile("files/" + name)
 	if err != nil {
@@ -121,12 +132,12 @@ func Plan(o Options) ([]Step, error) {
 	switch o.Mode {
 	case "pipewire":
 		s = append(s,
-			Step{Comment: "D-Bus policy for the ModemManager name", Write: &File{Path: DBusPolicy, Data: asset("bt-headset-hid.conf"), Perm: 0o644}},
+			Step{Comment: "D-Bus policy for the ModemManager name", Write: &File{Path: DBusPolicy, Data: Policy("pipewire"), Perm: 0o644}},
 			Step{Comment: "stop ModemManager (it would own the same bus name)", Try: []string{"systemctl", "disable", "--now", "ModemManager.service"}},
 		)
 	case "ofono":
 		s = append(s,
-			Step{Comment: "D-Bus policy for the oFono name", Write: &File{Path: DBusPolicy, Data: asset("bt-headset-hid-ofono.conf"), Perm: 0o644}},
+			Step{Comment: "D-Bus policy for the oFono name", Write: &File{Path: DBusPolicy, Data: Policy("ofono"), Perm: 0o644}},
 			Step{Comment: "start ModemManager again if mode pipewire stopped it (mobile broadband)", Try: []string{"systemctl", "enable", "--now", "ModemManager.service"}},
 		)
 	default:

@@ -13,7 +13,8 @@ type Exec struct{}
 
 func (Exec) Run(argv []string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	// Stdin lets "bt-headset-hid wireplumber" ask which headsets to set up.
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%v: %w", argv, err)
 	}

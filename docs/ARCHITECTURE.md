@@ -54,25 +54,25 @@ service `bt-headset-hid session` watches the calls of the modem on the system bu
 goes on, it pauses the MPRIS players that are playing and switches the connected configured
 headsets to `headset-head-unit` (`pw-dump`, `wpctl set-profile`); two seconds after the last call
 ended it switches back the ones it switched and resumes the players it paused. The logic is in
-`callswitch`, the I/O in `desktop`. With `-profile phone`, WirePlumber rules
-(`device.name = bluez_card.<address>`) set `device.profile = headset-head-unit` instead, so the
-headsets start in the phone profile and stay there; a profile the user picks by hand is stored by
-WirePlumber and still wins. Other Bluetooth devices keep A2DP either way. WirePlumber rules also
-rename the call audio nodes of these headsets (`bluez_output.<address>.1` from
-`api.bluez5.sco.sink`, `bluez_input.<address>.0` from `api.bluez5.sco.source`) to
-`bluez_output.bt-headset-hid.1` and `bluez_input.bt-headset-hid.0`. The PipeWire configuration
-adds two loopbacks, a sink and a source both called `bt-headset-hid`, targeting these names, so
-they follow whichever headset is in the phone profile. With two connected, `bt-headset-hid session`
+`callswitch`, the I/O in `desktop`. With `-profile phone` the session puts them in
+`headset-head-unit` when they connect and leaves them there. Other Bluetooth devices keep A2DP
+either way. The headsets are a list in `~/.config/bt-headset-hid/headsets`. The PipeWire
+configuration adds two loopbacks, a sink and a source both called `bt-headset-hid`; the session
+watches PipeWire (`pw-dump --monitor`) and points their side towards the headset at the call audio
+(`api.bluez5.sco.sink`/`.source`) of a listed headset by setting `target.object` in the
+`default` metadata (`callswitch.RouteFor`), preferring the one that took the call, or deletes it so WirePlumber
+falls back to the default devices. So pairing, unpairing and changing the list need no restart
+of WirePlumber. With two connected, `bt-headset-hid session`
 switches only the one whose node is the default output (`default.audio.sink`), so the call goes
-where the music plays; if neither is, it switches both and WirePlumber takes the first it finds,
-as it does with `-profile phone`. In mode ofono the daemon knows which headset took the call (the
+where the music plays; if neither is, it switches both and the loopbacks take the first in the list,
+as with `-profile phone`. In mode ofono the daemon knows which headset took the call (the
 one whose button answered or dialled, published as `CallDevice`): the session then switches only
 that one, and none while the call only rings (`callswitch.Route`); a call taken in the softphone
 falls back to the default output as above. Without `-profile phone` WirePlumber's own switch
 (`media-role.use-headset-profile` in 0.4, `bluetooth.autoswitch-to-headset-profile` in 0.5) is
 turned off: when a call stream starts it would switch every Bluetooth headset, including ones
-bt-headset-hid does not serve. Their side towards the headset is passive, so the call audio only runs while a program
-uses them; without a headset WirePlumber connects them to the default devices.
+bt-headset-hid does not serve. The loopbacks' side towards the headset is passive, so the call
+audio only runs while a program uses them.
 
 Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
 passes an Active that follows Idle on to the modem only after one second, and drops it when
@@ -102,6 +102,7 @@ PipeWire (or, in mode ofono, over HFP) is dropped, in case the headset reported 
 | `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON; in modes pipewire and ofono also the headset rules, the PipeWire loopbacks for the `bt-headset-hid` speaker and microphone and the user service for `bt-headset-hid session` | files |
 | `callswitch` | During a call: pause playing media players, switch headsets from A2DP to the phone profile, and back afterwards | none (behind an interface) |
 | `desktop` | I/O of `bt-headset-hid session`: `pw-dump`/`wpctl`, MPRIS on the session bus, the call state on the system bus (oFono name or modem) | commands, D-Bus |
+| `doctor` | `bt-headset-hid doctor`: findings with fixes from the facts gathered by the command (service, files, BlueZ, conflicting programs, PipeWire, WirePlumber configuration, log lines) | none |
 | `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner | files, commands |
 | `dbustest` | Private `dbus-daemon` for tests | process |
 

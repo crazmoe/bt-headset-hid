@@ -48,13 +48,4 @@ func TestHeadsets(t *testing.T) {
 	if !reflect.DeepEqual(hs, want) {
 		t.Fatalf("Headsets = %v", hs)
 	}
-	if h, ok := PickHeadset(hs); !ok || h.Name != "Jabra Evolve 65" {
-		t.Errorf("PickHeadset = %v, %v", h, ok)
-	}
-	if _, ok := PickHeadset([]Headset{hs[0], {Address: "x"}}); ok {
-		t.Error("picked one of two disconnected headsets")
-	}
-	if h, ok := PickHeadset(hs[:1]); !ok || h != hs[0] {
-		t.Errorf("single headset: %v, %v", h, ok)
-	}
 }

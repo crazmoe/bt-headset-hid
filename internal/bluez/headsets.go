@@ -46,21 +46,3 @@ func Headsets(conn *dbus.Conn) ([]Headset, error) {
 	sort.Slice(hs, func(i, j int) bool { return hs[i].Address < hs[j].Address })
 	return hs, nil
 }
-
-// PickHeadset returns the only headset, or the only connected one among
-// several.
-func PickHeadset(hs []Headset) (Headset, bool) {
-	if len(hs) == 1 {
-		return hs[0], true
-	}
-	var conn []Headset
-	for _, h := range hs {
-		if h.Connected {
-			conn = append(conn, h)
-		}
-	}
-	if len(conn) == 1 {
-		return conn[0], true
-	}
-	return Headset{}, false
-}

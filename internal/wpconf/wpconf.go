@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Files are the same as contrib/wireplumber; a test keeps them in sync.
@@ -118,4 +119,22 @@ func Remove(dir string) ([]string, error) {
 		}
 	}
 	return removed, nil
+}
+
+// Snapshot returns the contents of the WirePlumber and PipeWire files this
+// package writes below dir, so a caller can tell whether they changed and
+// PipeWire needs a restart. The headset list is not among them.
+func Snapshot(dir string) string {
+	a, b := Paths(dir, Version{0, 5})
+	c, d := HeadsetPaths(dir, Version{0, 5})
+	var sb strings.Builder
+	for _, p := range []string{a, b, c, d, noAutoswitchPath(dir), DevicesPath(dir)} {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			fmt.Fprintf(&sb, "%s: none\n", p)
+			continue
+		}
+		fmt.Fprintf(&sb, "%s: %d %q\n", p, len(data), data)
+	}
+	return sb.String()
 }

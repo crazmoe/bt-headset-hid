@@ -13,7 +13,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and
 
 > **Beta testers wanted:** please try bt-headset-hid with your headset and softphone in daily use
 > and report what works and what does not in a [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues)
-> (headset model, distribution, PipeWire version, `journalctl -u bt-headset-hid`).
+> (headset model, distribution, PipeWire version, the output of `bt-headset-hid doctor` and `journalctl -u bt-headset-hid`).
 
 ## Three modes
 
@@ -93,19 +93,33 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    policy and switching off ModemManager, for `ofono` the D-Bus policy and starting ModemManager
    again, and the WirePlumber configuration of your user (0.4 or 0.5, detected automatically). In
    `-mode pipewire` and `-mode ofono` it also creates a speaker and a microphone named
-   `bt-headset-hid` for the paired headset (for several headsets see `-headset` below). Run it again to switch modes; `sudo bt-headset-hid uninstall`
-   removes everything.
+   `bt-headset-hid` for the paired headset; if several are paired, it lists them and asks which
+   ones you use for calls (Enter takes the connected ones, or all). Run it again to switch modes;
+   `sudo bt-headset-hid uninstall` removes everything. At the end, check the setup as your normal
+   user:
+
+   ```
+   bt-headset-hid doctor
+   ```
+
+   It checks the service, Bluetooth, the paired headsets, programs that get in the way (oFono,
+   ModemManager, PulseAudio), PipeWire and your WirePlumber configuration, and prints the command
+   that fixes each problem it finds (in German if your desktop is set to German).
 
 3. **Connect the headset** as usual (`bluetoothctl` or your desktop; reconnect it if it was
-   already connected) and watch `journalctl -u bt-headset-hid -f` for "headset … connected".
+   already connected). `bt-headset-hid doctor` should now list it as connected; the log is in
+   `journalctl -u bt-headset-hid -f` ("headset … connected").
    In `-mode pipewire` and `-mode ofono` the headset plays music (A2DP). When a call rings or you call someone,
    the user service `bt-headset-hid-session` pauses media players that are playing, switches
    the headset to the phone profile (HFP), and after the call switches back and resumes them
    (`journalctl --user -u bt-headset-hid-session -f`). In `-mode ofono` it switches only once you
    answer, and only the headset you answer on; while it rings, the headsets beep themselves.
-   Players are paused through MPRIS, which most players and browsers support. If you paired the headset only after `install`, run
-   `bt-headset-hid wireplumber` once as your user so this and the `bt-headset-hid` speaker and
-   microphone apply to it.
+   Players are paused through MPRIS, which most players and browsers support. A headset you pair
+   after `install` is set up by itself a few seconds after pairing, without any restart (the user
+   service's log says `newly paired headset ... set up`). Headsets that were
+   already paired at `install` and that you did not choose stay left out. A headset you unpair
+   (remove in the Bluetooth settings) is taken out by itself, without a restart, and is not set up
+   again if you pair it again.
 
 4. **Select the device in the softphone.** It is called `bt-headset-hid`. In `-mode pipewire`
    and `-mode ofono` also choose `bt-headset-hid` as speaker and microphone: these always exist, pass the sound to
@@ -123,19 +137,27 @@ What `install` does, step by step, if you prefer to do it yourself:
   removes the file of the other version and restarts PipeWire; `-remove` undoes it. Without `-mode`
   it keeps the mode set up before. By hand: copy
   the matching file from `contrib/wireplumber/` to the path written in its first lines.
-  In `-mode pipewire` and `-mode ofono` it also sets up the headsets: a WirePlumber rule
-  (`52-bt-headset-hid-headset.lua` or `.conf`) gives their call audio one name,
-  `~/.config/systemd/user/bt-headset-hid-session.service` switches them to the phone profile for
-  calls, and `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf` adds the `bt-headset-hid` speaker
-  and microphone, which use whichever of them is connected (with two connected, the call goes to
-  the one you answer or dial on in `-mode ofono`, so the default output can stay e.g. a Bluetooth
-  speaker; otherwise to the one chosen as output in the sound settings; with `-profile phone`, to
-  the first one PipeWire finds). It takes the headsets set up before, otherwise the paired one; to set up
+  In `-mode pipewire` and `-mode ofono` it also sets up the headsets: their list goes to
+  `~/.config/bt-headset-hid/headsets`, `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf`
+  adds the `bt-headset-hid` speaker and microphone, and the user service
+  `~/.config/systemd/user/bt-headset-hid-session.service` switches the headsets to the phone
+  profile for calls and points the `bt-headset-hid` speaker and microphone at the call audio of
+  the one connected, while everything runs, so changing the list needs no restart (with two
+  connected, the call goes to the one you answer or dial on in `-mode ofono`, so the default output
+  can stay e.g. a Bluetooth speaker; otherwise to the one chosen as output in the sound settings;
+  with `-profile phone`, to the first in the list). It takes the headsets set up before, otherwise the paired one,
+  and asks if several are paired (without a terminal it takes the connected ones, or all); to set up
   several, e.g. one for the office and one for home, or to change them:
-  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. It also turns off WirePlumber's own switch to the
-  phone profile (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), which would switch every
+  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. It notes the headsets paired at that moment, and
+  the ones you leave out with `-headset`, in `~/.config/bt-headset-hid/known-headsets`; these are
+  not set up again even when paired again. A headset paired later for the first time is not on
+  that list, and the user service sets it up by itself. It also turns off WirePlumber's own switch to the
+  phone profile (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`, 0.5:
+  `wireplumber.conf.d/52-bt-headset-hid-headset.conf`), which would switch every
   Bluetooth headset when a call starts. With `-profile phone` the headsets stay in the
-  phone profile all the time instead, without the user service (`-profile switch` goes back).
+  phone profile all the time instead; the user service puts them there when they connect
+  (`-profile switch` goes back). The command restarts PipeWire only when a WirePlumber or PipeWire
+  file changed; the per-headset WirePlumber rules of older versions are removed then.
 - Only for `-mode pipewire`: `sudo systemctl disable --now ModemManager` (mobile broadband modems
   stop working while bt-headset-hid runs) and
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire must be built with
@@ -165,6 +187,9 @@ dongle, the headset keeps ringing until the host sets the Off-Hook LED; a softph
 when it sees the hook switch.
 
 ### Troubleshooting
+
+Start with `bt-headset-hid doctor` (as your normal user, or with `sudo` to also read the
+service's log): it finds most of the problems below and prints the fix.
 
 - `org.freedesktop.ModemManager1 is already owned`: ModemManager is still running (`install` with `-mode pipewire` does this).
 - `org.ofono is already owned` in `-mode ofono`: the real oFono is running

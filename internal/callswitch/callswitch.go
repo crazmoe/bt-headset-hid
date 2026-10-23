@@ -68,8 +68,8 @@ func forCall(cards []Card, device string) []Card {
 // IsPhone reports whether profile is a phone profile.
 func IsPhone(profile string) bool { return strings.HasPrefix(profile, PhoneProfile) }
 
-// phoneProfile picks the phone profile of c, or "" if it has none.
-func (c Card) phoneProfile() string {
+// PhoneProfile picks the phone profile of c, or "" if it has none.
+func (c Card) PhoneProfile() string {
 	if _, ok := c.Profiles[PhoneProfile]; ok {
 		return PhoneProfile
 	}
@@ -203,7 +203,7 @@ func (s *Switcher) switchFor(r Route) {
 		if IsPhone(c.Profile) {
 			continue
 		}
-		phone := c.phoneProfile()
+		phone := c.PhoneProfile()
 		if phone == "" {
 			s.logf("%s has no phone profile", c.Name)
 			continue
