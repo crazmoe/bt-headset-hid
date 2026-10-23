@@ -8,7 +8,7 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
-## Unreleased
+## 0.5.0
 
 - New `bt-headset-hid doctor`: checks the service, Bluetooth, the paired headsets, programs that
   get in the way (oFono, hsphfpd, ModemManager, PulseAudio), PipeWire, the WirePlumber
