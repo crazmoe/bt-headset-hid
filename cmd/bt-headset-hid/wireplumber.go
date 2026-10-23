@@ -45,8 +45,9 @@ func runWirePlumber(args []string) error {
 	if err != nil {
 		return err
 	}
+	before := wpconf.ConfiguredMode(dir)
 	if *mode == "" {
-		if *mode = wpconf.ConfiguredMode(dir); *mode == "" {
+		if *mode = before; *mode == "" {
 			*mode = "ofono"
 		}
 	}
@@ -125,7 +126,11 @@ func runWirePlumber(args []string) error {
 			return err
 		}
 	}
-	fmt.Println("now restart the daemon: sudo systemctl restart bt-headset-hid")
+	// Only a new mode changes who provides HFP; the headsets alone do not
+	// concern the daemon.
+	if *remove || *mode != before {
+		fmt.Println("now restart the daemon: sudo systemctl restart bt-headset-hid")
+	}
 	return nil
 }
 

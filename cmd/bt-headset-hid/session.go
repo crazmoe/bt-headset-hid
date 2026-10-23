@@ -139,6 +139,15 @@ func runSession(args []string) error {
 				sw.Call(false, callswitch.Route{})
 				return errors.New("system bus closed")
 			}
+			if dev, ok := unpaired(sig); ok {
+				// A device of an adapter that went away is not unpaired.
+				if _, err := bluez.LocalAddress(sys, dev); err == nil {
+					if a := dropHeadset(dir, bluez.AddressFromPath(dev), logger); a != "" {
+						delete(names, cardName(a))
+					}
+				}
+				continue
+			}
 			if pairingChanged(sig) {
 				adoptPending, adopt = true, nil
 				continue
@@ -166,12 +175,20 @@ func cardName(addr string) string {
 	return "bluez_card." + strings.ReplaceAll(strings.ToUpper(addr), ":", "_")
 }
 
-// watchPairing subscribes conn to BlueZ's signals about new and changed
-// devices, which pairingChanged recognizes.
+// watchPairing subscribes conn to BlueZ's signals about new, changed and
+// removed devices, which pairingChanged and unpaired recognize.
 func watchPairing(conn *dbus.Conn) error {
 	err := conn.AddMatchSignal(
 		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
 		dbus.WithMatchMember("InterfacesAdded"),
+		dbus.WithMatchSender("org.bluez"),
+	)
+	if err != nil {
+		return err
+	}
+	err = conn.AddMatchSignal(
+		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
+		dbus.WithMatchMember("InterfacesRemoved"),
 		dbus.WithMatchSender("org.bluez"),
 	)
 	if err != nil {
@@ -233,12 +250,7 @@ func adoptHeadsets(sys *dbus.Conn, dir string, logger *log.Logger) []string {
 	if len(add) == 0 {
 		return nil
 	}
-	out, err := exec.Command("wireplumber", "--version").CombinedOutput()
-	if err != nil {
-		logger.Printf("set up %s: wireplumber --version: %v", strings.Join(add, ", "), err)
-		return nil
-	}
-	v, err := wpconf.ParseVersion(string(out))
+	v, err := wireplumberVersion()
 	if err != nil {
 		logger.Printf("set up %s: %v", strings.Join(add, ", "), err)
 		return nil
@@ -256,4 +268,60 @@ func adoptHeadsets(sys *dbus.Conn, dir string, logger *log.Logger) []string {
 		logger.Printf("systemctl --user restart wireplumber: %v: %s", err, out)
 	}
 	return add
+}
+
+// unpaired returns the device path if sig says BlueZ removed a device, as it
+// does when the device is unpaired (or its adapter goes away).
+func unpaired(sig *dbus.Signal) (dbus.ObjectPath, bool) {
+	if sig.Name != "org.freedesktop.DBus.ObjectManager.InterfacesRemoved" || len(sig.Body) < 2 {
+		return "", false
+	}
+	path, _ := sig.Body[0].(dbus.ObjectPath)
+	ifaces, _ := sig.Body[1].([]string)
+	for _, i := range ifaces {
+		if i == "org.bluez.Device1" && bluez.AddressFromPath(path) != "" {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+// dropHeadset takes the unpaired headset addr out of the headset rules and
+// returns it, or "" if it was not set up. It stays on the known list, so
+// pairing it again does not set it up again. WirePlumber needs no restart:
+// a rule for a headset that is not there does nothing.
+func dropHeadset(dir, addr string, logger *log.Logger) string {
+	configured := wpconf.ConfiguredHeadsets(dir)
+	keep := droppedHeadsets(configured, []string{addr})
+	if len(keep) == len(configured) {
+		return ""
+	}
+	known, _ := wpconf.Known(dir)
+	if err := wpconf.SetKnown(dir, append(known, addr)); err != nil {
+		logger.Printf("known headsets: %v", err)
+	}
+	var err error
+	if len(keep) == 0 {
+		_, err = wpconf.RemoveHeadset(dir)
+	} else {
+		var v wpconf.Version
+		if v, err = wireplumberVersion(); err == nil {
+			_, err = wpconf.InstallHeadset(dir, keep, v, wpconf.ConfiguredPhone(dir))
+		}
+	}
+	if err != nil {
+		logger.Printf("unpaired headset %s: %v", addr, err)
+		return ""
+	}
+	logger.Printf("unpaired headset %s no longer set up", addr)
+	return addr
+}
+
+// wireplumberVersion asks the installed WirePlumber for its version.
+func wireplumberVersion() (wpconf.Version, error) {
+	out, err := exec.Command("wireplumber", "--version").CombinedOutput()
+	if err != nil {
+		return wpconf.Version{}, fmt.Errorf("wireplumber --version: %v", err)
+	}
+	return wpconf.ParseVersion(string(out))
 }

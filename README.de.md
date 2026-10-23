@@ -121,7 +121,9 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    nach `install` koppelst, wird ein paar Sekunden nach dem Koppeln von selbst eingerichtet: Der
    Benutzerdienst nimmt es auf und startet WirePlumber neu (in seinem Protokoll steht
    `newly paired headset ... set up`). Headsets, die bei `install` schon gekoppelt waren und die du
-   nicht gewählt hast, bleiben aussen vor.
+   nicht gewählt hast, bleiben aussen vor. Ein Headset, das du entkoppelst (in den
+   Bluetooth-Einstellungen entfernst), wird von selbst ausgetragen, ohne Neustart, und beim
+   erneuten Koppeln nicht wieder eingerichtet.
 
 4. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Bei `-mode pipewire` und `-mode ofono` auch als
    Lautsprecher und Mikrofon `bt-headset-hid` wählen: Die gibt es immer, sie leiten den Ton zum

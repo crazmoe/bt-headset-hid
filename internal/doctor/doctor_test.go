@@ -155,7 +155,7 @@ func TestHIDNameAndLastStart(t *testing.T) {
 func TestNoLongerPaired(t *testing.T) {
 	f := healthy()
 	f.Configured = append(f.Configured, "84:D3:52:8C:B9:D0")
-	want := "bt-headset-hid wireplumber -headset 50:C2:75:0D:4E:03 && sudo systemctl restart bt-headset-hid"
+	want := "bt-headset-hid wireplumber -headset 50:C2:75:0D:4E:03"
 	for _, g := range Check(f, false) {
 		if g.Level == Info && strings.Contains(g.Text, "84:D3:52:8C:B9:D0") {
 			if g.Fix != want {

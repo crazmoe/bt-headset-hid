@@ -101,3 +101,17 @@ func TestPairingChanged(t *testing.T) {
 		t.Errorf("cardName = %s", got)
 	}
 }
+
+func TestUnpaired(t *testing.T) {
+	removed := "org.freedesktop.DBus.ObjectManager.InterfacesRemoved"
+	dev := dbus.ObjectPath("/org/bluez/hci0/dev_84_D3_52_8C_B9_D0")
+	if p, ok := unpaired(&dbus.Signal{Name: removed, Body: []any{dev, []string{"org.freedesktop.DBus.Properties", "org.bluez.Device1"}}}); !ok || p != dev {
+		t.Errorf("unpaired device = %s, %v", p, ok)
+	}
+	if _, ok := unpaired(&dbus.Signal{Name: removed, Body: []any{dev + "/sep1", []string{"org.bluez.MediaEndpoint1"}}}); ok {
+		t.Error("endpoint taken as unpaired device")
+	}
+	if _, ok := unpaired(&dbus.Signal{Name: removed}); ok {
+		t.Error("signal without body taken as unpaired device")
+	}
+}

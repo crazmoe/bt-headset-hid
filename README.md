@@ -117,7 +117,9 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    Players are paused through MPRIS, which most players and browsers support. A headset you pair
    after `install` is set up by itself a few seconds after pairing: the user service adds it and
    restarts WirePlumber (its log says `newly paired headset ... set up`). Headsets that were
-   already paired at `install` and that you did not choose stay left out.
+   already paired at `install` and that you did not choose stay left out. A headset you unpair
+   (remove in the Bluetooth settings) is taken out by itself, without a restart, and is not set up
+   again if you pair it again.
 
 4. **Select the device in the softphone.** It is called `bt-headset-hid`. In `-mode pipewire`
    and `-mode ofono` also choose `bt-headset-hid` as speaker and microphone: these always exist, pass the sound to

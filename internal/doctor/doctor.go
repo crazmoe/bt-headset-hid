@@ -306,7 +306,7 @@ func (c *checker) audio(f Facts) {
 		if len(gone) > 0 {
 			fix := ""
 			if keep := without(f.Configured, gone); len(keep) > 0 {
-				fix = "bt-headset-hid wireplumber -headset " + strings.Join(keep, ",") + " && sudo systemctl restart bt-headset-hid"
+				fix = "bt-headset-hid wireplumber -headset " + strings.Join(keep, ",")
 			}
 			c.add(Info, "eingerichtet, aber nicht mehr gekoppelt: "+strings.Join(gone, ", "),
 				"set up but no longer paired: "+strings.Join(gone, ", "), fix)

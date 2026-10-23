@@ -20,6 +20,9 @@ version and the output of `journalctl -u bt-headset-hid`, as a
   service `bt-headset-hid-session` adds it and restarts WirePlumber. Headsets that were already
   paired when the headsets were last set up stay left out (`~/.config/bt-headset-hid/known-headsets`).
   The user service therefore now also runs with `-profile phone` and without a headset yet.
+- Modes pipewire and ofono: a headset you unpair is taken out of the configuration by itself,
+  without restarting anything, and stays out if paired again.
+- `bt-headset-hid wireplumber` only asks to restart the daemon when the mode changed.
 
 ## 0.4.0
 
