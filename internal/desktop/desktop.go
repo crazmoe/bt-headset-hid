@@ -104,8 +104,9 @@ func SetTarget(c callswitch.Change) error {
 }
 
 // Monitor runs "pw-dump --monitor" and sends on changed, without blocking,
-// whenever PipeWire's objects change, until ctx ends. It starts it again
-// when it ends, as it does when PipeWire restarts.
+// whenever PipeWire's nodes, devices or metadata change (see
+// callswitch.MonitorFilter), until ctx ends. It starts it again when it
+// ends, as it does when PipeWire restarts.
 func Monitor(ctx context.Context, changed chan<- struct{}, logf func(string, ...any)) {
 	for {
 		cmd := exec.CommandContext(ctx, "pw-dump", "--monitor", "--no-colors")
@@ -116,16 +117,27 @@ func Monitor(ctx context.Context, changed chan<- struct{}, logf func(string, ...
 		if err != nil {
 			logf("pw-dump --monitor: %v", err)
 		} else {
-			buf := make([]byte, 64<<10)
+			var filter callswitch.MonitorFilter
+			dec := json.NewDecoder(out)
 			for {
-				if _, err := out.Read(buf); err != nil {
+				var update json.RawMessage
+				if err := dec.Decode(&update); err != nil {
 					break
+				}
+				relevant, err := filter.Relevant(update)
+				if err != nil {
+					logf("pw-dump --monitor: %v", err)
+					relevant = true
+				}
+				if !relevant {
+					continue
 				}
 				select {
 				case changed <- struct{}{}:
 				default:
 				}
 			}
+			cmd.Process.Kill()
 			cmd.Wait()
 		}
 		select {
