@@ -119,8 +119,8 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    Abnehmen um, und nur das Headset, mit dem du abnimmst; solange es klingelt, piepsen die Headsets
    selbst. Pausiert wird über MPRIS, das die meisten Player und Browser können. Ein Headset, das du erst
    nach `install` koppelst, wird ein paar Sekunden nach dem Koppeln von selbst eingerichtet: Der
-   Benutzerdienst nimmt es auf und startet WirePlumber neu (in seinem Protokoll steht
-   `newly paired headset ... set up`). Headsets, die bei `install` schon gekoppelt waren und die du
+   Benutzerdienst nimmt es auf und startet PipeWire und WirePlumber neu (in seinem Protokoll steht
+   `newly paired headset ... set up`); ein schon laufendes Softphone danach neu starten. Headsets, die bei `install` schon gekoppelt waren und die du
    nicht gewählt hast, bleiben aussen vor. Ein Headset, das du entkoppelst (in den
    Bluetooth-Einstellungen entfernst), wird von selbst ausgetragen, ohne Neustart, und beim
    erneuten Koppeln nicht wieder eingerichtet.

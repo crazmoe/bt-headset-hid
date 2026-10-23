@@ -17,7 +17,7 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 - `install` and `bt-headset-hid wireplumber` ask which headsets to set up when several are
   paired, instead of setting up none; without a terminal they take the connected ones, or all.
 - Modes pipewire and ofono: a headset paired after `install` is set up by itself; the user
-  service `bt-headset-hid-session` adds it and restarts WirePlumber. Headsets that were already
+  service `bt-headset-hid-session` adds it and restarts PipeWire and WirePlumber. Headsets that were already
   paired when the headsets were last set up stay left out (`~/.config/bt-headset-hid/known-headsets`).
   The user service therefore now also runs with `-profile phone` and without a headset yet.
 - Modes pipewire and ofono: a headset you unpair is taken out of the configuration by itself,

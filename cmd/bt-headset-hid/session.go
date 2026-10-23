@@ -122,7 +122,7 @@ func runSession(args []string) error {
 	}
 	// Newly paired headsets are set up a moment after the last change in
 	// BlueZ, once their profiles are known, and not during a call, since
-	// that restarts WirePlumber.
+	// that restarts PipeWire and WirePlumber.
 	var adopt <-chan time.Time
 	adoptPending := true
 	check(false)
@@ -229,7 +229,7 @@ func pairingChanged(sig *dbus.Signal) bool {
 }
 
 // adoptHeadsets sets up the headsets paired since the headsets were last set
-// up, restarts WirePlumber for them and returns them. Without a list of the
+// up, restarts PipeWire and WirePlumber for them and returns them. Without a list of the
 // headsets known before, from an older version, it only writes that list.
 func adoptHeadsets(sys *dbus.Conn, dir string, logger *log.Logger) []string {
 	hs, err := bluez.Headsets(sys)
@@ -264,8 +264,8 @@ func adoptHeadsets(sys *dbus.Conn, dir string, logger *log.Logger) []string {
 	}
 	logger.Printf("newly paired headset %s set up; to undo: bt-headset-hid wireplumber -headset %s",
 		strings.Join(add, ", "), strings.Join(configured, ","))
-	if out, err := exec.Command("systemctl", "--user", "restart", "wireplumber").CombinedOutput(); err != nil {
-		logger.Printf("systemctl --user restart wireplumber: %v: %s", err, out)
+	if err := restartPipeWire(); err != nil {
+		logger.Print(err)
 	}
 	return add
 }

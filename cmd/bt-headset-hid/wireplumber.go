@@ -111,11 +111,9 @@ func runWirePlumber(args []string) error {
 
 	if !*noRestart {
 		fmt.Println("restarting PipeWire and WirePlumber")
-		if out, err := exec.Command("systemctl", "--user", "restart", "pipewire", "wireplumber").CombinedOutput(); err != nil {
-			return fmt.Errorf("systemctl --user restart: %v: %s", err, out)
+		if err := restartPipeWire(); err != nil {
+			return err
 		}
-		// Not every system has pipewire-pulse; try-restart ignores it then.
-		exec.Command("systemctl", "--user", "try-restart", "pipewire-pulse").Run()
 	}
 	if session {
 		if err := startSession(dir, !*noRestart); err != nil {
@@ -407,4 +405,16 @@ func pickNumbers(answer string, hs []bluez.Headset) ([]bluez.Headset, bool) {
 func isTerminal(f *os.File) bool {
 	st, err := f.Stat()
 	return err == nil && st.Mode()&os.ModeCharDevice != 0
+}
+
+// restartPipeWire restarts the user's PipeWire together with WirePlumber:
+// restarting WirePlumber alone can leave PipeWire 1.0 with WirePlumber 0.4
+// without any links, so no program has sound.
+func restartPipeWire() error {
+	if out, err := exec.Command("systemctl", "--user", "restart", "pipewire", "wireplumber").CombinedOutput(); err != nil {
+		return fmt.Errorf("systemctl --user restart: %v: %s", err, out)
+	}
+	// Not every system has pipewire-pulse; try-restart ignores it then.
+	exec.Command("systemctl", "--user", "try-restart", "pipewire-pulse").Run()
+	return nil
 }

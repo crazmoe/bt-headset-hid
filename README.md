@@ -116,7 +116,8 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    answer, and only the headset you answer on; while it rings, the headsets beep themselves.
    Players are paused through MPRIS, which most players and browsers support. A headset you pair
    after `install` is set up by itself a few seconds after pairing: the user service adds it and
-   restarts WirePlumber (its log says `newly paired headset ... set up`). Headsets that were
+   restarts PipeWire and WirePlumber (its log says `newly paired headset ... set up`); restart the
+   softphone afterwards if it was already running. Headsets that were
    already paired at `install` and that you did not choose stay left out. A headset you unpair
    (remove in the Bluetooth settings) is taken out by itself, without a restart, and is not set up
    again if you pair it again.
