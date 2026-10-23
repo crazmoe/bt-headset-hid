@@ -5,6 +5,7 @@ package doctor
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/crazmoe/bt-headset-hid/internal/install"
@@ -47,8 +48,15 @@ type Facts struct {
 	Root bool // doctor runs as root, so the user's session is not seen
 
 	// The system service: Mode is read from its unit, "" if not installed.
-	Mode        string
-	Service     State
+	Mode    string
+	Service State
+	// UnitProgram is the program the unit starts, symlinks resolved.
+	UnitProgram string
+	// Packaged: the program of the deb or rpm package is installed.
+	Packaged bool
+	// Programs are the programs bt-headset-hid in the order the shell finds
+	// them on PATH, symlinks resolved, each once.
+	Programs    []string
 	Log         []string // lines of its log since it last started
 	LogReadable bool     // the log could be read
 
@@ -81,6 +89,7 @@ type Facts struct {
 func Check(f Facts, de bool) []Finding {
 	c := checker{de: de}
 	c.service(f)
+	c.copies(f)
 	if f.Mode == "" {
 		return c.out
 	}
@@ -127,6 +136,41 @@ func (c *checker) service(f Facts) {
 		c.add(Fail, "Dienst läuft nicht ("+string(f.Service)+")", "service not running ("+string(f.Service)+")",
 			"sudo systemctl enable --now bt-headset-hid")
 	}
+}
+
+// copies finds an older copy of the program, e.g. in /usr/local/bin from
+// "install" before the package, that the shell or the service runs
+// instead of the package's.
+func (c *checker) copies(f Facts) {
+	if !f.Packaged {
+		return
+	}
+	var old []string
+	for _, p := range f.Programs {
+		if p == install.PackagedBinary {
+			break
+		}
+		old = append(old, p)
+	}
+	unitOld := f.UnitProgram != "" && f.UnitProgram != install.PackagedBinary
+	if unitOld && !slices.Contains(old, f.UnitProgram) {
+		old = append(old, f.UnitProgram)
+	}
+	if len(old) == 0 {
+		return
+	}
+	fix := "sudo rm " + strings.Join(old, " ") + " && hash -r"
+	if unitOld {
+		fix += " && sudo bt-headset-hid install"
+	}
+	list := strings.Join(old, ", ")
+	if unitOld {
+		c.add(Fail, "der Dienst startet eine ältere Kopie ("+list+") statt des Pakets",
+			"the service starts an older copy ("+list+") instead of the package", fix)
+		return
+	}
+	c.add(Fail, "eine ältere Kopie ("+list+") verdeckt das Paket, bt-headset-hid-Befehle nehmen sie",
+		"an older copy ("+list+") hides the package, bt-headset-hid commands run it", fix)
 }
 
 func (c *checker) files(f Facts) {
@@ -372,6 +416,21 @@ func ModeFromUnit(unit []byte) string {
 			}
 		}
 		return "ofono"
+	}
+	return ""
+}
+
+// ProgramFromUnit returns the program the systemd unit starts, "" if it
+// has no ExecStart.
+func ProgramFromUnit(unit []byte) string {
+	for _, l := range strings.Split(string(unit), "\n") {
+		cmd, ok := strings.CutPrefix(strings.TrimSpace(l), "ExecStart=")
+		if !ok {
+			continue
+		}
+		if f := strings.Fields(cmd); len(f) > 0 {
+			return strings.TrimLeft(f[0], "-@:+!")
+		}
 	}
 	return ""
 }

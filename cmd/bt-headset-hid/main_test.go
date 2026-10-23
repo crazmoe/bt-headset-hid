@@ -2,6 +2,9 @@ package main
 
 import (
 	"io"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -99,5 +102,35 @@ func TestUnpaired(t *testing.T) {
 	}
 	if _, ok := unpaired(&dbus.Signal{Name: removed}); ok {
 		t.Error("signal without body taken as unpaired device")
+	}
+}
+
+func TestPrograms(t *testing.T) {
+	dir := t.TempDir()
+	local, usr, bin, empty := filepath.Join(dir, "local"), filepath.Join(dir, "usr"), filepath.Join(dir, "bin"), filepath.Join(dir, "empty")
+	for _, d := range []string{local, usr, empty} {
+		if err := os.Mkdir(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// bin is a symlink to usr, as /bin to /usr/bin.
+	if err := os.Symlink(usr, bin); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{local, usr} {
+		if err := os.WriteFile(filepath.Join(d, "bt-headset-hid"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Not executable: the shell skips it.
+	if err := os.WriteFile(filepath.Join(empty, "bt-headset-hid"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	usrReal, _ := filepath.EvalSymlinks(usr)
+	localReal, _ := filepath.EvalSymlinks(local)
+	got := programs(strings.Join([]string{empty, local, usr, bin}, ":"))
+	want := []string{filepath.Join(localReal, "bt-headset-hid"), filepath.Join(usrReal, "bt-headset-hid")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("programs = %v, want %v", got, want)
 	}
 }

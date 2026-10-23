@@ -10,6 +10,9 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 
 ## Unreleased
 
+- `doctor` (and so the user service's notifications and tray icon) finds an older copy of the
+  program, e.g. in `/usr/local/bin` from an installation before the package, that the shell or
+  the service runs instead of the package's, and says how to remove it.
 - Tray icon of the user service: shows whether a headset is connected, a call and the problems
   `doctor` finds (click one for the fix), lets you tick the headsets used for calls, check the
   setup now and open the help. Desktops with a tray (KDE, Xfce, Cinnamon, MATE, LXQt, waybar;

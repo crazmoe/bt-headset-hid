@@ -71,7 +71,7 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    bt-headset-hid doctor
    ```
 
-   Das prüft den Dienst, Bluetooth, die gekoppelten Headsets, Programme, die sich in die Quere
+   Das prüft den Dienst, ältere Kopien des Programms, die das Paket verdecken, Bluetooth, die gekoppelten Headsets, Programme, die sich in die Quere
    kommen (oFono, ModemManager, PulseAudio), PipeWire und deine WirePlumber-Konfiguration, und gibt
    zu jedem gefundenen Problem den Befehl aus, der es behebt (auf Deutsch, wenn dein Desktop auf
    Deutsch eingestellt ist). Der Benutzerdienst macht dieselben Prüfungen ab und zu selbst und
