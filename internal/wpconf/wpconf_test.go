@@ -272,3 +272,43 @@ func TestConfiguredMode(t *testing.T) {
 		}
 	}
 }
+
+func TestKnown(t *testing.T) {
+	dir := t.TempDir()
+	if _, ok := Known(dir); ok {
+		t.Fatal("Known without a list = true")
+	}
+	if err := SetKnown(dir, []string{"ac:bf:71:12:34:56", "50:C2:75:0D:4E:03", "AC:BF:71:12:34:56", "junk"}); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := Known(dir)
+	if !ok || strings.Join(got, ",") != "50:C2:75:0D:4E:03,AC:BF:71:12:34:56" {
+		t.Errorf("Known = %q, %v", got, ok)
+	}
+	if err := SetKnown(dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := Known(dir); !ok || got != nil {
+		t.Errorf("Known of an empty list = %q, %v", got, ok)
+	}
+	if ok, err := RemoveKnown(dir); !ok || err != nil {
+		t.Fatalf("RemoveKnown = %v, %v", ok, err)
+	}
+	if ok, err := RemoveKnown(dir); ok || err != nil {
+		t.Fatalf("second RemoveKnown = %v, %v", ok, err)
+	}
+}
+
+func TestNewHeadsets(t *testing.T) {
+	const jabra, jbl, car = "50:C2:75:0D:4E:03", "AC:BF:71:12:34:56", "00:11:22:33:44:55"
+	paired := []string{jabra, strings.ToLower(jbl), car}
+	if got := NewHeadsets(paired, []string{jabra}, nil, false); got != nil {
+		t.Errorf("without a known list: %q", got)
+	}
+	if got := NewHeadsets(paired, []string{jabra}, []string{car}, true); strings.Join(got, ",") != jbl {
+		t.Errorf("NewHeadsets = %q, want %s", got, jbl)
+	}
+	if got := NewHeadsets(paired, nil, []string{jabra, jbl, car}, true); got != nil {
+		t.Errorf("all known: %q", got)
+	}
+}

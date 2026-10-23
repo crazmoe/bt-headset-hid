@@ -23,6 +23,7 @@ body:
       label: Mode
       multiple: true
       options:
+        - ofono
         - pipewire
         - hfp
     validations:
@@ -76,7 +77,7 @@ body:
         - label: Hanging up with the headset button
         - label: Rejecting an incoming call
         - label: Call audio through the headset (speaker and microphone)
-        - label: "Only `-mode hfp`: redial, volume keys"
+        - label: "Only `-mode hfp` and `-mode ofono`: redial, volume keys"
         - label: Music and media keys still behave as expected outside calls
   - type: textarea
     id: notes

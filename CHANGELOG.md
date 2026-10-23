@@ -8,6 +8,19 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
+## Unreleased
+
+- New `bt-headset-hid doctor`: checks the service, Bluetooth, the paired headsets, programs that
+  get in the way (oFono, hsphfpd, ModemManager, PulseAudio), PipeWire, the WirePlumber
+  configuration and known errors in the service's log, and prints the command that fixes each
+  problem, in German or English after the desktop language. `install` points to it at the end.
+- `install` and `bt-headset-hid wireplumber` ask which headsets to set up when several are
+  paired, instead of setting up none; without a terminal they take the connected ones, or all.
+- Modes pipewire and ofono: a headset paired after `install` is set up by itself; the user
+  service `bt-headset-hid-session` adds it and restarts WirePlumber. Headsets that were already
+  paired when the headsets were last set up stay left out (`~/.config/bt-headset-hid/known-headsets`).
+  The user service therefore now also runs with `-profile phone` and without a headset yet.
+
 ## 0.4.0
 
 - New mode `ofono`: bt-headset-hid handles the headset itself as in mode hfp (all buttons,

@@ -13,7 +13,7 @@ Siehe [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) für den Aufbau und
 
 > **Betatester gesucht:** Bitte probiere bt-headset-hid mit deinem Headset und Softphone im Alltag aus
 > und melde, was geht und was nicht, in einem [GitHub-Issue](https://github.com/crazmoe/bt-headset-hid/issues)
-> (Headset-Modell, Distribution, PipeWire-Version, `journalctl -u bt-headset-hid`).
+> (Headset-Modell, Distribution, PipeWire-Version, die Ausgabe von `bt-headset-hid doctor` und `journalctl -u bt-headset-hid`).
 
 ## Drei Modi
 
@@ -96,19 +96,32 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    D-Bus-Policy und das erneute Starten von ModemManager, und die WirePlumber-Konfiguration deines
    Benutzers (0.4 oder 0.5, wird automatisch erkannt). Bei `-mode pipewire` und `-mode ofono` legt
    er ausserdem einen Lautsprecher und ein Mikrofon namens `bt-headset-hid` für das gekoppelte
-   Headset an (mehrere Headsets: siehe `-headset` unten). Zum Moduswechsel einfach erneut ausführen;
-   `sudo bt-headset-hid uninstall` entfernt alles wieder.
+   Headset an; sind mehrere gekoppelt, listet er sie auf und fragt, welche du zum Telefonieren
+   nutzt (Enter nimmt die verbundenen, sonst alle). Zum Moduswechsel einfach erneut ausführen;
+   `sudo bt-headset-hid uninstall` entfernt alles wieder. Zum Schluss als normaler Benutzer die
+   Einrichtung prüfen:
+
+   ```
+   bt-headset-hid doctor
+   ```
+
+   Das prüft den Dienst, Bluetooth, die gekoppelten Headsets, Programme, die sich in die Quere
+   kommen (oFono, ModemManager, PulseAudio), PipeWire und deine WirePlumber-Konfiguration, und gibt
+   zu jedem gefundenen Problem den Befehl aus, der es behebt (auf Deutsch, wenn dein Desktop auf
+   Deutsch eingestellt ist).
 
 3. **Headset verbinden** wie gewohnt (`bluetoothctl` oder über den Desktop; war es schon
-   verbunden, neu verbinden) und in `journalctl -u bt-headset-hid -f` auf „headset … connected“
-   achten. Bei `-mode pipewire` und `-mode ofono` spielt das Headset Musik (A2DP). Klingelt es oder rufst du an,
+   verbunden, neu verbinden). `bt-headset-hid doctor` sollte es jetzt als verbunden zeigen; das
+   Protokoll steht in `journalctl -u bt-headset-hid -f` („headset … connected“). Bei `-mode pipewire` und `-mode ofono` spielt das Headset Musik (A2DP). Klingelt es oder rufst du an,
    pausiert der Benutzerdienst `bt-headset-hid-session` laufende Player, schaltet das Headset ins
    Telefonprofil (HFP) und nach dem Gespräch zurück und setzt die Player fort
    (`journalctl --user -u bt-headset-hid-session -f`). Bei `-mode ofono` schaltet er erst beim
    Abnehmen um, und nur das Headset, mit dem du abnimmst; solange es klingelt, piepsen die Headsets
-   selbst. Pausiert wird über MPRIS, das die meisten Player und Browser können. Hast du das Headset erst nach `install` gekoppelt, einmal
-   `bt-headset-hid wireplumber` als normaler Benutzer ausführen, damit das und Lautsprecher und
-   Mikrofon `bt-headset-hid` dafür gelten.
+   selbst. Pausiert wird über MPRIS, das die meisten Player und Browser können. Ein Headset, das du erst
+   nach `install` koppelst, wird ein paar Sekunden nach dem Koppeln von selbst eingerichtet: Der
+   Benutzerdienst nimmt es auf und startet WirePlumber neu (in seinem Protokoll steht
+   `newly paired headset ... set up`). Headsets, die bei `install` schon gekoppelt waren und die du
+   nicht gewählt hast, bleiben aussen vor.
 
 4. **Gerät im Softphone auswählen.** Es heißt `bt-headset-hid`. Bei `-mode pipewire` und `-mode ofono` auch als
    Lautsprecher und Mikrofon `bt-headset-hid` wählen: Die gibt es immer, sie leiten den Ton zum
@@ -132,12 +145,16 @@ Was `install` Schritt für Schritt macht, falls du es lieber selbst machst:
   `bt-headset-hid` an, die das gerade verbundene davon nutzen (sind zwei verbunden, geht das Gespräch
   bei `-mode ofono` an das, mit dem du abnimmst oder wählst, sodass die Standardausgabe z. B. ein
   Bluetooth-Lautsprecher bleiben kann; sonst an das, das in den Toneinstellungen als Ausgabe gewählt
-  ist; mit `-profile phone` an das erste, das PipeWire findet). Es nimmt die bisher eingerichteten Headsets, sonst das gekoppelte; um mehrere
-  einzurichten, etwa eines fürs Büro und eines für zu Hause, oder zum Wechseln:
-  `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Ausserdem schaltet es WirePlumbers eigenen
+  ist; mit `-profile phone` an das erste, das PipeWire findet). Es nimmt die bisher eingerichteten
+  Headsets, sonst das gekoppelte, und fragt nach, wenn mehrere gekoppelt sind (ohne Terminal nimmt
+  es die verbundenen, sonst alle); um mehrere einzurichten, etwa eines fürs Büro und eines für zu
+  Hause, oder zum Wechseln: `-headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY`. Die in dem Moment
+  gekoppelten Headsets merkt es sich in `~/.config/bt-headset-hid/known-headsets`; später
+  gekoppelte stehen nicht darauf, und der Benutzerdienst richtet sie von selbst ein. Ausserdem schaltet es WirePlumbers eigenen
   Wechsel ins Telefonprofil ab (0.4: `policy.lua.d/52-bt-headset-hid-session.lua`), der bei einem
   Gespräch jedes Bluetooth-Headset umschalten würde. Mit `-profile phone` bleiben die Headsets
-  stattdessen immer im Telefonprofil, ohne den Benutzerdienst (`-profile switch` schaltet zurück).
+  stattdessen immer im Telefonprofil; der Benutzerdienst richtet dann nur neu gekoppelte Headsets
+  ein (`-profile switch` schaltet zurück).
 - Nur für `-mode pipewire`: `sudo systemctl disable --now ModemManager` (Mobilfunkmodems gehen
   nicht, solange bt-headset-hid läuft) und
   `sudo cp contrib/dbus/bt-headset-hid.conf /etc/dbus-1/system.d/`. PipeWire muss mit
@@ -167,6 +184,9 @@ klingelt das Headset weiter, bis der Rechner die Off-Hook-LED setzt; ein Softpho
 sobald es den Hook Switch sieht.
 
 ### Fehlersuche
+
+Am besten mit `bt-headset-hid doctor` anfangen (als normaler Benutzer, oder mit `sudo`, um auch das
+Protokoll des Dienstes zu lesen): Es findet die meisten der folgenden Probleme und nennt die Lösung.
 
 - `org.freedesktop.ModemManager1 is already owned`: ModemManager läuft noch (`install` mit `-mode pipewire` erledigt das).
 - `org.ofono is already owned` bei `-mode ofono`: Das echte oFono läuft

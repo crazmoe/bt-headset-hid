@@ -23,6 +23,7 @@ body:
     attributes:
       label: Mode
       options:
+        - ofono
         - pipewire
         - hfp
     validations:
@@ -71,6 +72,12 @@ body:
       placeholder: Teams in Chrome 130, Zoom 6.2, ...
     validations:
       required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of bt-headset-hid doctor
+      description: Run `bt-headset-hid doctor` as your normal user and paste the output.
+      render: text
   - type: textarea
     id: journal
     attributes:

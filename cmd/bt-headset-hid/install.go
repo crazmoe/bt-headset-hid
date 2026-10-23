@@ -87,8 +87,8 @@ func runInstall(args []string, uninstall bool) error {
 		fmt.Println("bt-headset-hid removed. If you use ModemManager and mode pipewire stopped it: sudo systemctl enable --now ModemManager")
 		return nil
 	}
-	fmt.Println("bt-headset-hid installed in mode", mode+". Reconnect the headset, then check:")
-	fmt.Println("  journalctl -u bt-headset-hid -f")
+	fmt.Println("bt-headset-hid installed in mode", mode+". Reconnect the headset, then check the setup as your normal user:")
+	fmt.Println("  bt-headset-hid doctor")
 	return nil
 }
 

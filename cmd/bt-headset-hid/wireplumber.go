@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -55,6 +58,12 @@ func runWirePlumber(args []string) error {
 			var hs []string
 			hs, err = wpconf.RemoveHeadset(dir)
 			removed = append(removed, hs...)
+		}
+		if err == nil {
+			var ok bool
+			if ok, err = wpconf.RemoveKnown(dir); ok {
+				removed = append(removed, wpconf.KnownPath(dir))
+			}
 		}
 		for _, p := range removed {
 			fmt.Println("removed", p)
@@ -125,7 +134,8 @@ func runWirePlumber(args []string) error {
 // profile "phone" they always stay in the phone profile, otherwise they play
 // music and "bt-headset-hid session" switches them for calls. Other Bluetooth
 // devices keep A2DP. Mode hfp, where PipeWire has no call audio, removes it
-// all. It reports whether the session service is needed.
+// all. It reports whether the session service is needed; in modes pipewire
+// and ofono it always is, since it also sets up headsets paired later.
 func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, error) {
 	if mode == "hfp" {
 		removed, err := wpconf.RemoveHeadset(dir)
@@ -138,6 +148,11 @@ func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, erro
 		}
 		if ok {
 			removed = append(removed, wpconf.DevicesPath(dir))
+		}
+		if ok, err := wpconf.RemoveKnown(dir); err != nil {
+			return false, err
+		} else if ok {
+			removed = append(removed, wpconf.KnownPath(dir))
 		}
 		for _, p := range removed {
 			fmt.Println("removed", p)
@@ -156,41 +171,67 @@ func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, erro
 			addrs = append(addrs, a)
 		}
 	}
+	paired, pairedErr := pairedHeadsets()
 	name := strings.Join(addrs, ", ")
 	if dropped := droppedHeadsets(wpconf.ConfiguredHeadsets(dir), addrs); len(addrs) > 0 && len(dropped) > 0 {
 		fmt.Printf("no longer set up: %s; to keep them too: -headset %s\n",
 			strings.Join(dropped, ", "), strings.Join(append(addrs, dropped...), ","))
 	}
 	if len(addrs) == 0 {
-		addrs = wpconf.ConfiguredHeadsets(dir)
-		name = strings.Join(addrs, ", ") + " (as before; others: -headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY)"
-	}
-	if len(addrs) == 0 {
-		h, err := findHeadset()
-		if err != nil {
-			fmt.Printf("no phone profile and no speaker and microphone \"bt-headset-hid\": %v\n", err)
-			fmt.Println("  pair the headset, then run this again, or pass -headset XX:XX:XX:XX:XX:XX")
-			return false, nil
+		if configured := wpconf.ConfiguredHeadsets(dir); len(configured) > 0 {
+			known, ok := wpconf.Known(dir)
+			added := wpconf.NewHeadsets(addresses(paired), configured, known, ok)
+			addrs = append(configured, added...)
+			name = strings.Join(addrs, ", ") + " (as before"
+			if len(added) > 0 {
+				name += ", and the newly paired " + strings.Join(added, ", ")
+			}
+			name += "; others: -headset XX:XX:XX:XX:XX:XX,YY:YY:YY:YY:YY:YY)"
+		} else if pairedErr != nil {
+			fmt.Printf("could not ask BlueZ for the paired headsets: %v\n", pairedErr)
+		} else {
+			hs := chooseHeadsets(paired, os.Stdin, isTerminal(os.Stdin), os.Stdout)
+			var names []string
+			for _, h := range hs {
+				addrs = append(addrs, h.Address)
+				names = append(names, fmt.Sprintf("%s (%s)", h.Name, h.Address))
+			}
+			name = strings.Join(names, ", ")
 		}
-		addrs, name = []string{h.Address}, fmt.Sprintf("%s (%s)", h.Name, h.Address)
 	}
-	path, err := wpconf.InstallHeadset(dir, addrs, v, profile == "phone")
-	if err != nil {
+	// Headsets paired now and not chosen stay as they are; ones paired
+	// later are set up by "bt-headset-hid session".
+	known, _ := wpconf.Known(dir)
+	if pairedErr == nil {
+		known = addresses(paired)
+	}
+	if err := wpconf.SetKnown(dir, append(known, addrs...)); err != nil {
 		return false, err
 	}
-	if profile == "phone" {
-		fmt.Printf("wrote %s: %s stay in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
+	if len(addrs) == 0 {
+		if _, err := wpconf.RemoveHeadset(dir); err != nil {
+			return false, err
+		}
+		fmt.Println("no headset paired yet: pair it as usual, it is set up by itself once paired")
 	} else {
-		fmt.Printf("wrote %s: %s\n", path, name)
-		fmt.Println("  they play music (A2DP) and switch to the phone profile for calls; always the phone profile: -profile phone")
+		path, err := wpconf.InstallHeadset(dir, addrs, v, profile == "phone")
+		if err != nil {
+			return false, err
+		}
+		if profile == "phone" {
+			fmt.Printf("wrote %s: %s stay in the phone profile, other Bluetooth devices keep music (A2DP)\n", path, name)
+		} else {
+			fmt.Printf("wrote %s: %s\n", path, name)
+			fmt.Println("  they play music (A2DP) and switch to the phone profile for calls; always the phone profile: -profile phone")
+		}
 	}
-	path, err = wpconf.InstallDevices(dir)
+	path, err := wpconf.InstallDevices(dir)
 	if err != nil {
 		return false, err
 	}
 	fmt.Printf("wrote %s: speaker and microphone \"bt-headset-hid\" for the connected headset\n", path)
 	fmt.Println("  choose \"bt-headset-hid\" in the softphone for the phone device, the speaker and the microphone")
-	return profile != "phone", nil
+	return true, nil
 }
 
 // startSession writes and enables the user service "bt-headset-hid session"
@@ -200,7 +241,7 @@ func startSession(dir string, restart bool) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("wrote %s: during calls it switches the headsets to the phone profile and pauses media players\n", path)
+	fmt.Printf("wrote %s: it switches the headsets to the phone profile for calls, pausing media players, and sets up headsets paired later\n", path)
 	cmds := [][]string{{"daemon-reload"}, {"enable", wpconf.SessionUnit}}
 	if restart {
 		cmds = append(cmds, []string{"restart", wpconf.SessionUnit})
@@ -263,29 +304,99 @@ func droppedHeadsets(before, addrs []string) []string {
 	return dropped
 }
 
-// findHeadset asks BlueZ for the paired headset.
-func findHeadset() (bluez.Headset, error) {
+// pairedHeadsets asks BlueZ for the paired headsets.
+func pairedHeadsets() ([]bluez.Headset, error) {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
-		return bluez.Headset{}, err
+		return nil, err
 	}
 	defer conn.Close()
-	hs, err := bluez.Headsets(conn)
-	if err != nil {
-		return bluez.Headset{}, fmt.Errorf("BlueZ: %w", err)
-	}
-	if h, ok := bluez.PickHeadset(hs); ok {
-		return h, nil
-	}
-	if len(hs) == 0 {
-		return bluez.Headset{}, errors.New("no paired headset found")
-	}
-	var all []string
-	msg := "several headsets, pick them (comma-separated) or connect only the one to use:"
+	return bluez.Headsets(conn)
+}
+
+func addresses(hs []bluez.Headset) []string {
+	var addrs []string
 	for _, h := range hs {
-		msg += fmt.Sprintf("\n    -headset %s   %s", h.Address, h.Name)
-		all = append(all, h.Address)
+		addrs = append(addrs, h.Address)
 	}
-	msg += fmt.Sprintf("\n    -headset %s   all of them", strings.Join(all, ","))
-	return bluez.Headset{}, errors.New(msg)
+	return addrs
+}
+
+// chooseHeadsets picks the headsets to set up from the paired ones hs. With
+// several and interactive, it asks on in and out; the default is the
+// connected ones, or all if none is.
+func chooseHeadsets(hs []bluez.Headset, in io.Reader, interactive bool, out io.Writer) []bluez.Headset {
+	if len(hs) <= 1 {
+		return hs
+	}
+	var def []bluez.Headset
+	var defNums []string
+	for i, h := range hs {
+		if h.Connected {
+			def = append(def, h)
+			defNums = append(defNums, strconv.Itoa(i+1))
+		}
+	}
+	if len(def) == 0 {
+		def, defNums = hs, []string{"all"}
+	}
+	if !interactive {
+		fmt.Fprintf(out, "several headsets are paired, setting up %s; to pick others: -headset XX:XX:XX:XX:XX:XX,...\n",
+			strings.Join(addresses(def), ", "))
+		return def
+	}
+	fmt.Fprintln(out, "Several headsets are paired. Which ones do you use for calls?")
+	for i, h := range hs {
+		state := ""
+		if h.Connected {
+			state = ", connected"
+		}
+		fmt.Fprintf(out, "  %d) %s (%s%s)\n", i+1, h.Name, h.Address, state)
+	}
+	r := bufio.NewReader(in)
+	for {
+		fmt.Fprintf(out, "Numbers separated by commas, \"all\" for all [%s]: ", strings.Join(defNums, ","))
+		line, err := r.ReadString('\n')
+		answer := strings.ToLower(strings.TrimSpace(line))
+		if answer == "" {
+			if err != nil {
+				fmt.Fprintln(out)
+			}
+			return def
+		}
+		if answer == "all" || answer == "a" {
+			return hs
+		}
+		if picked, ok := pickNumbers(answer, hs); ok {
+			return picked
+		}
+		if err != nil {
+			fmt.Fprintln(out)
+			return def
+		}
+	}
+}
+
+// pickNumbers returns the headsets numbered (from 1) in answer, such as
+// "1,3" or "1 3".
+func pickNumbers(answer string, hs []bluez.Headset) ([]bluez.Headset, bool) {
+	var picked []bluez.Headset
+	seen := map[int]bool{}
+	for _, f := range strings.FieldsFunc(answer, func(r rune) bool { return r == ',' || r == ' ' }) {
+		n, err := strconv.Atoi(f)
+		if err != nil || n < 1 || n > len(hs) {
+			return nil, false
+		}
+		if !seen[n] {
+			seen[n] = true
+			picked = append(picked, hs[n-1])
+		}
+	}
+	return picked, len(picked) > 0
+}
+
+// isTerminal reports whether f is a terminal, where a question can be asked.
+func isTerminal(f *os.File) bool {
+	st, err := f.Stat()
+	return err == nil && st.Mode()&os.ModeCharDevice != 0
 }

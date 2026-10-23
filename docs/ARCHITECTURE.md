@@ -102,6 +102,7 @@ PipeWire (or, in mode ofono, over HFP) is dropped, in case the headset reported 
 | `wpconf` | Per-user WirePlumber configuration for a mode (`bt-headset-hid wireplumber`), WirePlumber 0.4 Lua or 0.5 SPA-JSON; in modes pipewire and ofono also the headset rules, the PipeWire loopbacks for the `bt-headset-hid` speaker and microphone and the user service for `bt-headset-hid session` | files |
 | `callswitch` | During a call: pause playing media players, switch headsets from A2DP to the phone profile, and back afterwards | none (behind an interface) |
 | `desktop` | I/O of `bt-headset-hid session`: `pw-dump`/`wpctl`, MPRIS on the session bus, the call state on the system bus (oFono name or modem) | commands, D-Bus |
+| `doctor` | `bt-headset-hid doctor`: findings with fixes from the facts gathered by the command (service, files, BlueZ, conflicting programs, PipeWire, WirePlumber configuration, log lines) | none |
 | `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner | files, commands |
 | `dbustest` | Private `dbus-daemon` for tests | process |
 
