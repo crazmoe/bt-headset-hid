@@ -178,3 +178,67 @@ func TestEncodeAndGainLines(t *testing.T) {
 		t.Error("gain lines not clamped")
 	}
 }
+
+func TestCodecNegotiation(t *testing.T) {
+	ag := New(HFP, DefaultFeatures|FeatureCodecNegotiation)
+	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 548", "OK")
+	expectLines(t, ag, "AT+BAC=1,2", "OK")
+	if !ag.CodecNegotiation() {
+		t.Fatal("no codec negotiation")
+	}
+	// An answer before a proposal is an error.
+	expectLines(t, ag, "AT+BCS=2", "ERROR")
+
+	line, codec := ag.ProposeCodec(CodecCVSD, CodecMSBC)
+	if line != "+BCS: 2" || codec != CodecMSBC {
+		t.Fatalf("ProposeCodec = %q, %d", line, codec)
+	}
+	expectLines(t, ag, "AT+BCS=1", "ERROR") // not what was proposed
+	r := expectLines(t, ag, "AT+BCS=2", "OK")
+	if r.Event == nil || *r.Event != (Event{Kind: CodecSelected, Value: CodecMSBC}) {
+		t.Fatalf("event = %+v", r.Event)
+	}
+	expectLines(t, ag, "AT+BCS=2", "ERROR") // already answered
+
+	// The audio side cannot do mSBC.
+	if line, codec := ag.ProposeCodec(CodecCVSD); line != "+BCS: 1" || codec != CodecCVSD {
+		t.Fatalf("ProposeCodec(CVSD) = %q, %d", line, codec)
+	}
+	// The headset refuses by sending its list again.
+	r = expectLines(t, ag, "AT+BAC=1", "OK")
+	if r.Event == nil || *r.Event != (Event{Kind: CodecSelected}) {
+		t.Fatalf("refusal event = %+v", r.Event)
+	}
+	// Now it only has CVSD.
+	if line, codec := ag.ProposeCodec(CodecCVSD, CodecMSBC); line != "+BCS: 1" || codec != CodecCVSD {
+		t.Fatalf("ProposeCodec after AT+BAC=1 = %q, %d", line, codec)
+	}
+	ag.CancelProposal()
+	expectLines(t, ag, "AT+BCS=1", "ERROR")
+}
+
+func TestCodecWithoutNegotiation(t *testing.T) {
+	// The headset does not announce codec negotiation (bit 7).
+	ag := New(HFP, DefaultFeatures|FeatureCodecNegotiation)
+	expectLines(t, ag, "AT+BRSF=31", "+BRSF: 548", "OK")
+	if line, codec := ag.ProposeCodec(CodecCVSD, CodecMSBC); line != "" || codec != CodecCVSD {
+		t.Fatalf("ProposeCodec = %q, %d", line, codec)
+	}
+	// Nor do we: mode hfp.
+	ag = New(HFP, DefaultFeatures)
+	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 36", "OK")
+	if ag.CodecNegotiation() {
+		t.Fatal("codec negotiation without the AG feature")
+	}
+	if ag := New(HSP, DefaultFeatures|FeatureCodecNegotiation); ag.CodecNegotiation() {
+		t.Fatal("codec negotiation with HSP")
+	}
+}
+
+func TestCodecListBounds(t *testing.T) {
+	ag := New(HFP, DefaultFeatures)
+	for _, l := range []string{"AT+BAC=", "AT+BAC=0", "AT+BAC=1,x", "AT+BAC=256", "AT+BAC=1,2,3,4,5,6,7,8,9", "AT+BAC?"} {
+		expectLines(t, ag, l, "ERROR")
+	}
+	expectLines(t, ag, "AT+BAC=1,2,3,4,5,6,7,8", "OK")
+}

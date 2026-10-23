@@ -22,8 +22,9 @@ func (f *fakeRunner) RunAs(user string, uid int, argv []string) error {
 
 func TestFilesMatchContrib(t *testing.T) {
 	for name, contrib := range map[string]string{
-		"70-bt-headset-hid.rules": "../../contrib/udev/70-bt-headset-hid.rules",
-		"bt-headset-hid.conf":     "../../contrib/dbus/bt-headset-hid.conf",
+		"70-bt-headset-hid.rules":   "../../contrib/udev/70-bt-headset-hid.rules",
+		"bt-headset-hid.conf":       "../../contrib/dbus/bt-headset-hid.conf",
+		"bt-headset-hid-ofono.conf": "../../contrib/dbus/bt-headset-hid-ofono.conf",
 	} {
 		b, err := os.ReadFile(contrib)
 		if err != nil || !bytes.Equal(b, asset(name)) {
@@ -89,6 +90,25 @@ func TestInstallSwitchUninstall(t *testing.T) {
 	}
 	if !containsRun(r.runs, "systemctl", "disable", "--now", "ModemManager.service") {
 		t.Errorf("ModemManager not disabled: %v", r.runs)
+	}
+
+	// Switching to ofono lets the daemon own org.ofono instead and gives
+	// ModemManager back.
+	o.Mode = "ofono"
+	steps, _ = Plan(o)
+	r = apply(t, steps, o, root)
+	unit, _ = os.ReadFile(filepath.Join(root, Unit))
+	policy, _ := os.ReadFile(filepath.Join(root, DBusPolicy))
+	if !strings.Contains(string(unit), "-mode ofono\n") || !strings.Contains(string(policy), `own="org.ofono"`) ||
+		strings.Contains(string(policy), "ModemManager1") {
+		t.Errorf("ofono: policy:\n%s\nunit:\n%s", policy, unit)
+	}
+	if !containsRun(r.runs, "systemctl", "enable", "--now", "ModemManager.service") ||
+		containsRun(r.runs, "systemctl", "disable", "--now", "ModemManager.service") {
+		t.Errorf("ofono mode does not give ModemManager back: %v", r.runs)
+	}
+	if !reflect.DeepEqual(r.asUser, [][]string{{"moe", "5", Binary, "wireplumber", "-mode", "ofono"}}) {
+		t.Errorf("as user %v", r.asUser)
 	}
 
 	// Switching to hfp rewrites the unit and drops the D-Bus policy.

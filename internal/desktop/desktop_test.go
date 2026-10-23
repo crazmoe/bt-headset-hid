@@ -10,6 +10,7 @@ import (
 	"github.com/crazmoe/bt-headset-hid/internal/dbustest"
 	"github.com/crazmoe/bt-headset-hid/internal/hfp"
 	"github.com/crazmoe/bt-headset-hid/internal/modem"
+	"github.com/crazmoe/bt-headset-hid/internal/ofono"
 )
 
 func TestInCall(t *testing.T) {
@@ -47,6 +48,36 @@ func TestInCall(t *testing.T) {
 	waitSignal(t, sigs)
 	if in, err := InCall(watcher); in || err != nil {
 		t.Fatalf("InCall after the modem left = %v, %v", in, err)
+	}
+}
+
+// TestInCallOFono: in mode ofono the daemon publishes the call state under
+// the oFono name, while the real ModemManager may run beside it.
+func TestInCallOFono(t *testing.T) {
+	addr := dbustest.Bus(t)
+	watcher := dbustest.Connect(t, addr)
+	sigs := make(chan *dbus.Signal, 32)
+	watcher.Signal(sigs)
+	if err := Watch(watcher); err != nil {
+		t.Fatal(err)
+	}
+	srv, err := ofono.Serve(dbustest.Connect(t, addr), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitSignal(t, sigs)
+	if in, err := InCall(watcher); in || err != nil {
+		t.Fatalf("InCall when idle = %v, %v", in, err)
+	}
+	for _, step := range []struct {
+		state hfp.CallState
+		want  bool
+	}{{hfp.Incoming, true}, {hfp.Outgoing, true}, {hfp.Active, true}, {hfp.Idle, false}} {
+		srv.SetCallState(step.state)
+		waitSignal(t, sigs)
+		if in, err := InCall(watcher); in != step.want || err != nil {
+			t.Fatalf("after %v: InCall = %v, %v", step.state, in, err)
+		}
 	}
 }
 

@@ -18,17 +18,17 @@ import (
 
 // runWirePlumber implements "bt-headset-hid wireplumber": it installs or
 // removes the WirePlumber configuration of the current user for a mode, in
-// mode pipewire also the fixed "bt-headset-hid" speaker and microphone, and
+// modes pipewire and ofono also the fixed "bt-headset-hid" speaker and microphone, and
 // restarts the user's PipeWire session.
 func runWirePlumber(args []string) error {
 	fs := flag.NewFlagSet("wireplumber", flag.ContinueOnError)
-	mode := fs.String("mode", "pipewire", `mode the daemon runs in: "pipewire" or "hfp"`)
+	mode := fs.String("mode", "", `mode the daemon runs in: "pipewire", "hfp" or "ofono" (default: as before, else pipewire)`)
 	remove := fs.Bool("remove", false, "remove the configuration instead")
 	noRestart := fs.Bool("no-restart", false, "do not restart WirePlumber and PipeWire")
-	profile := fs.String("profile", "", `-mode pipewire: "switch" plays music (A2DP) on the headsets and switches them to the phone profile for calls, pausing media players; "phone" keeps them in the phone profile (default: as before, else switch)`)
-	headset := fs.String("headset", "", `-mode pipewire: Bluetooth addresses of the headsets, comma-separated, for the phone profile and the "bt-headset-hid" speaker and microphone (default: as before, else the paired headset)`)
+	profile := fs.String("profile", "", `-mode pipewire and ofono: "switch" plays music (A2DP) on the headsets and switches them to the phone profile for calls, pausing media players; "phone" keeps them in the phone profile (default: as before, else switch)`)
+	headset := fs.String("headset", "", `-mode pipewire and ofono: Bluetooth addresses of the headsets, comma-separated, for the phone profile and the "bt-headset-hid" speaker and microphone (default: as before, else the paired headset)`)
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode pipewire|hfp] [-headset XX:XX:XX:XX:XX:XX[,...]] [-profile switch|phone] [-remove] [-no-restart]")
+		fmt.Fprintln(fs.Output(), "usage: bt-headset-hid wireplumber [-mode pipewire|hfp|ofono] [-headset XX:XX:XX:XX:XX:XX[,...]] [-profile switch|phone] [-remove] [-no-restart]")
 		fmt.Fprintln(fs.Output(), "Run as your normal user, not with sudo.")
 		fs.PrintDefaults()
 	}
@@ -41,6 +41,11 @@ func runWirePlumber(args []string) error {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return err
+	}
+	if *mode == "" {
+		if *mode = wpconf.ConfiguredMode(dir); *mode == "" {
+			*mode = "pipewire"
+		}
 	}
 
 	session := false
@@ -115,14 +120,14 @@ func runWirePlumber(args []string) error {
 	return nil
 }
 
-// setupHeadset sets up the headsets in mode pipewire: the fixed
+// setupHeadset sets up the headsets in modes pipewire and ofono: the fixed
 // "bt-headset-hid" speaker and microphone use the one connected, and with
 // profile "phone" they always stay in the phone profile, otherwise they play
 // music and "bt-headset-hid session" switches them for calls. Other Bluetooth
 // devices keep A2DP. Mode hfp, where PipeWire has no call audio, removes it
 // all. It reports whether the session service is needed.
 func setupHeadset(dir, mode, addr, profile string, v wpconf.Version) (bool, error) {
-	if mode != "pipewire" {
+	if mode == "hfp" {
 		removed, err := wpconf.RemoveHeadset(dir)
 		if err != nil {
 			return false, err

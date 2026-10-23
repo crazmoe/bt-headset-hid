@@ -52,10 +52,10 @@ func Paths(dir string, v Version) (target, other string) {
 	return conf, lua
 }
 
-// Content returns the configuration for mode ("pipewire" or "hfp") in the
-// format of v.
+// Content returns the configuration for mode ("pipewire", "hfp" or
+// "ofono") in the format of v.
 func Content(mode string, v Version) ([]byte, error) {
-	if mode != "pipewire" && mode != "hfp" {
+	if mode != "pipewire" && mode != "hfp" && mode != "ofono" {
 		return nil, fmt.Errorf("wpconf: unknown mode %q", mode)
 	}
 	ext := ".conf"
@@ -83,6 +83,24 @@ func Install(dir, mode string, v Version) (string, error) {
 		return "", err
 	}
 	return target, nil
+}
+
+var modeRE = regexp.MustCompile(`^(?:--|#) Mode (pipewire|hfp|ofono),`)
+
+// ConfiguredMode returns the mode of the configuration written before, from
+// its first line, or "" if there is none.
+func ConfiguredMode(dir string) string {
+	a, b := Paths(dir, Version{0, 5})
+	for _, p := range []string{a, b} {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		if m := modeRE.FindSubmatch(data); m != nil {
+			return string(m[1])
+		}
+	}
+	return ""
 }
 
 // Remove deletes the configuration in both formats. It returns the paths

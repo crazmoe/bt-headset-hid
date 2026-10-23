@@ -40,19 +40,19 @@ func main() {
 	}
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: bt-headset-hid [flags]")
-		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid install [-mode pipewire|hfp]   (set up everything)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid install [-mode pipewire|hfp|ofono]   (set up everything)")
 		fmt.Fprintln(flag.CommandLine.Output(), "       sudo bt-headset-hid uninstall")
-		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode pipewire|hfp] [-remove]   (only PipeWire, as your user)")
-		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid session   (user service of mode pipewire: phone profile during calls)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid wireplumber [-mode pipewire|hfp|ofono] [-remove]   (only PipeWire, as your user)")
+		fmt.Fprintln(flag.CommandLine.Output(), "       bt-headset-hid session   (user service of modes pipewire and ofono: phone profile during calls)")
 		flag.PrintDefaults()
 	}
 	mode := flag.String("mode", string(daemon.ModePipeWire),
-		`"pipewire": PipeWire keeps HFP and the audio, answer/hang up only; "hfp": all buttons, no call audio`)
+		`"pipewire": PipeWire keeps HFP and the audio, answer/hang up only; "hfp": all buttons, no call audio; "ofono": all buttons and call audio, ModemManager stays free`)
 	name := flag.String("name", "bt-headset-hid", "HID device name")
 	vendor := flag.Uint("vendor", daemon.DefaultVendor, "HID vendor ID")
 	product := flag.Uint("product", daemon.DefaultProduct, "HID product ID")
 	grabMediaKeys := flag.Bool("grab-media-keys", false,
-		`-mode pipewire: use the headset's play/pause key (AVRCP) as the call button instead of leaving it to the media player`)
+		`-mode pipewire and ofono: use the headset's play/pause key (AVRCP) as the call button instead of leaving it to the media player`)
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	if *showVersion {

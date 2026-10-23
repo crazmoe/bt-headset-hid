@@ -4,7 +4,7 @@ After=bluetooth.service dbus.service
 Wants=bluetooth.service
 
 [Service]
-# Switch modes with "sudo bt-headset-hid install -mode hfp" (or pipewire).
+# Switch modes with "sudo bt-headset-hid install -mode hfp" (or pipewire, ofono).
 ExecStart=/usr/local/bin/bt-headset-hid -mode pipewire
 Restart=on-failure
 RestartSec=5

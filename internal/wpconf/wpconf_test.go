@@ -37,6 +37,8 @@ func TestContent(t *testing.T) {
 		{"pipewire", Version{0, 4}, `["bluez5.hfphsp-backend-native-modem"] = "any"`},
 		{"hfp", Version{0, 5}, `bluez5.roles = [ a2dp_sink a2dp_source ]`},
 		{"pipewire", Version{0, 5}, `bluez5.hfphsp-backend-native-modem = "any"`},
+		{"ofono", Version{0, 4}, `bluez_monitor.properties["bluez5.hfphsp-backend"] = "ofono"`},
+		{"ofono", Version{0, 5}, `bluez5.hfphsp-backend = "ofono"`},
 	} {
 		b, err := Content(c.mode, c.v)
 		if err != nil || !strings.Contains(string(b), c.want) {
@@ -250,5 +252,23 @@ func TestSessionUnit(t *testing.T) {
 	}
 	if ok, err := RemoveSessionUnit(dir); ok || err != nil {
 		t.Fatalf("second RemoveSessionUnit = %v, %v", ok, err)
+	}
+}
+
+func TestConfiguredMode(t *testing.T) {
+	dir := t.TempDir()
+	if m := ConfiguredMode(dir); m != "" {
+		t.Fatalf("ConfiguredMode without files = %q", m)
+	}
+	for _, c := range []struct {
+		mode string
+		v    Version
+	}{{"ofono", Version{0, 4}}, {"hfp", Version{0, 5}}, {"pipewire", Version{0, 4}}, {"ofono", Version{0, 5}}} {
+		if _, err := Install(dir, c.mode, c.v); err != nil {
+			t.Fatal(err)
+		}
+		if m := ConfiguredMode(dir); m != c.mode {
+			t.Errorf("after Install(%s, %v): ConfiguredMode = %q", c.mode, c.v, m)
+		}
 	}
 }

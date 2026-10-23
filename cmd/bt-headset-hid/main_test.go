@@ -12,7 +12,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestAskMode(t *testing.T) {
-	for in, want := range map[string]string{"\n": "pipewire", "1\n": "pipewire", "2\n": "hfp", "x\nhfp\n": "hfp", "2": "hfp"} {
+	for in, want := range map[string]string{"\n": "pipewire", "1\n": "pipewire", "2\n": "hfp", "x\nhfp\n": "hfp", "2": "hfp", "3\n": "ofono", "ofono\n": "ofono"} {
 		got, err := askMode(strings.NewReader(in))
 		if err != nil || got != want {
 			t.Errorf("askMode(%q) = %q, %v", in, got, err)

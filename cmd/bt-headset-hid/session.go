@@ -24,7 +24,7 @@ import (
 const endDelay = 2 * time.Second
 
 // runSession implements "bt-headset-hid session", which runs in the user's
-// session in mode pipewire: during a call it pauses the media players and
+// session in modes pipewire and ofono: during a call it pauses the media players and
 // switches the headsets set up with "bt-headset-hid wireplumber" from music
 // (A2DP) to the phone profile, and back afterwards.
 func runSession(args []string) error {

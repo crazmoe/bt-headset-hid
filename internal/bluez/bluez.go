@@ -41,6 +41,12 @@ type profileSpec struct {
 }
 
 func spec(p hfp.Profile, features int) profileSpec {
+	// The SDP features are the low bits of the +BRSF features, plus
+	// wideband speech (bit 5) where we negotiate the codec.
+	sdp := features & 0x1f
+	if features&hfp.FeatureCodecNegotiation != 0 {
+		sdp |= 0x20
+	}
 	if p == hfp.HSP {
 		return profileSpec{
 			path: "/org/bluez/bt_headset_hid/hsp_ag", uuid: UUIDHSPAG, name: "bt-headset-hid HSP AG", channel: 12,
@@ -49,9 +55,8 @@ func spec(p hfp.Profile, features int) profileSpec {
 	return profileSpec{
 		path: "/org/bluez/bt_headset_hid/hfp_ag", uuid: UUIDHFPAG, name: "bt-headset-hid HFP AG", channel: 13,
 		opts: map[string]dbus.Variant{
-			"Version": dbus.MakeVariant(uint16(0x0107)),
-			// The SDP features are the low bits of the +BRSF features.
-			"Features": dbus.MakeVariant(uint16(features & 0x1f)),
+			"Version":  dbus.MakeVariant(uint16(0x0107)),
+			"Features": dbus.MakeVariant(uint16(sdp)),
 		},
 	}
 }
@@ -59,7 +64,7 @@ func spec(p hfp.Profile, features int) profileSpec {
 // ErrProfileInUse means another program already registered the Audio
 // Gateway profile with BlueZ, usually PipeWire, PulseAudio or oFono.
 var ErrProfileInUse = errors.New("another program (usually PipeWire) already provides the HFP/HSP Audio Gateway; " +
-	"disable it there (WirePlumber: bluez5.roles without hfp_ag/hsp_ag, see README) or use -mode pipewire")
+	"disable it there (\"bt-headset-hid wireplumber\" with the same -mode, see README) or use -mode pipewire")
 
 func isAlreadyExists(err error) bool {
 	var e dbus.Error
@@ -96,6 +101,24 @@ func AddressFromPath(p dbus.ObjectPath) string {
 	return addr
 }
 
+// LocalAddress returns the address of the adapter that device (a BlueZ
+// device path) belongs to.
+func LocalAddress(conn *dbus.Conn, device dbus.ObjectPath) (string, error) {
+	i := strings.LastIndex(string(device), "/")
+	if i <= 0 {
+		return "", fmt.Errorf("bluez: no adapter in %s", device)
+	}
+	v, err := conn.Object(service, device[:i]).GetProperty("org.bluez.Adapter1.Address")
+	if err != nil {
+		return "", fmt.Errorf("bluez: adapter address: %w", err)
+	}
+	addr, _ := v.Value().(string)
+	if len(addr) != 17 {
+		return "", fmt.Errorf("bluez: adapter address %q", addr)
+	}
+	return strings.ToUpper(addr), nil
+}
+
 // Profiles is the set of registered profiles.
 type Profiles struct {
 	conn  *dbus.Conn
@@ -117,8 +140,11 @@ func Register(conn *dbus.Conn, features int, profiles ...hfp.Profile) (*Profiles
 			return nil, err
 		}
 		opts := map[string]dbus.Variant{
-			"Name":                  dbus.MakeVariant(sp.name),
-			"Role":                  dbus.MakeVariant("server"),
+			"Name": dbus.MakeVariant(sp.name),
+			// No "Role": BlueZ then both accepts the headset's connection
+			// and connects to it itself, as for PipeWire's profile. With
+			// "server" only, BlueZ ignores AutoConnect, and a headset that
+			// waits for the computer to connect HFP never gets it.
 			"Channel":               dbus.MakeVariant(sp.channel),
 			"RequireAuthentication": dbus.MakeVariant(true),
 			"RequireAuthorization":  dbus.MakeVariant(false),
