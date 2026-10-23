@@ -82,7 +82,9 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    mitbringt). Es zeigt, ob ein Headset verbunden ist, einen Anruf, oder ein Warnzeichen, solange
    `doctor` ein Problem findet. Sein Menü listet die Probleme (ein Klick zeigt die Lösung), die
    gekoppelten Headsets, bei denen du in den Modi `pipewire` und `ofono` die für Anrufe abhakst (wie
-   mit `-headset`, ohne Neustart), „Jetzt prüfen“ und „Hilfe“.
+   mit `-headset`, ohne Neustart), „Jetzt prüfen“ und „Hilfe“. Unter Cinnamon (Linux Mint) braucht
+   die Leiste dafür das „XApp-Status-Applet“ (Rechtsklick auf die Leiste, „Applets“); ohne es
+   erscheint von keinem Programm ein Tray-Symbol.
 
 2. **Ohne Paket**, auf anderen Distributionen, das Tarball nehmen, entpacken und in den Ordner
    wechseln, oder selbst mit Go bauen:

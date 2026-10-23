@@ -80,7 +80,8 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    headset is connected, a call, or a warning sign while `doctor` finds a problem. Its menu
    lists the problems (click one for the fix), the paired headsets, where in modes `pipewire` and
    `ofono` you tick the ones for calls (as `-headset` does, without a restart), "Check now" and
-   "Help".
+   "Help". On Cinnamon (Linux Mint) the panel needs the "XApp Status Applet" for it (right-click
+   the panel, "Applets"); without it no tray icon of any program is shown.
 
 2. **Without the package**, on other distributions, take the tarball, unpack it and change into
    the folder, or build it yourself with Go:
