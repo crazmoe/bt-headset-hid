@@ -249,6 +249,14 @@ func startSession(dir string, restart bool) error {
 		return err
 	}
 	fmt.Printf("wrote %s: it switches the headsets to the phone profile for calls, pausing media players, and sets up headsets paired later\n", path)
+	if self, err := os.Executable(); err == nil {
+		if p, err := filepath.EvalSymlinks(self); err == nil {
+			self = p
+		}
+		if bin := sessionBinary(); bin != self {
+			fmt.Printf("  NOTE: it runs %s, not this program; to run this version, install it: sudo %s install\n", bin, self)
+		}
+	}
 	cmds := [][]string{{"daemon-reload"}, {"enable", wpconf.SessionUnit}}
 	if restart {
 		cmds = append(cmds, []string{"restart", wpconf.SessionUnit})
