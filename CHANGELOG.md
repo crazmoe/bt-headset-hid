@@ -31,6 +31,20 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 - Modes pipewire and ofono: a headset you unpair is taken out of the configuration by itself,
   without restarting anything, and stays out if paired again.
 - `bt-headset-hid wireplumber` only asks to restart the daemon when the mode changed.
+- The deb and rpm packages set themselves up: the package installs the system part in the mode
+  that works here, and its user service `bt-headset-hid-session`, enabled for every user, sets up
+  each user's PipeWire right away for the users logged in and at login for the others.
+  `sudo bt-headset-hid install` is only needed to change the mode. `bt-headset-hid wireplumber
+  -remove` keeps the user service from setting it up again.
+- `install` no longer asks for the mode: it keeps the mode of an earlier installation, else takes
+  `ofono`, or, if the oFono service runs or PipeWire lacks its oFono backend, `pipewire` (when
+  PipeWire handles it and ModemManager is not in use) or `hfp`, and says why. `-mode` still
+  chooses it. New `-system-only` skips the user's PipeWire, for the package.
+- Desktop notifications from the user service: when it set up PipeWire or a newly paired
+  headset, and for each new problem that `bt-headset-hid doctor` would report, with the fix.
+- Package repository for apt and dnf on GitHub Pages, built from the packages of all releases.
+  Once the repository key is in place, the packages add the repository, so later versions come
+  with the system updates (see docs/REPOSITORY.md).
 
 ## 0.4.0
 

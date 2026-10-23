@@ -320,3 +320,19 @@ func TestNewHeadsets(t *testing.T) {
 		t.Errorf("all known: %q", got)
 	}
 }
+
+func TestOff(t *testing.T) {
+	dir := t.TempDir()
+	if Off(dir) {
+		t.Fatal("off without the file")
+	}
+	if err := SetOff(dir, true); err != nil || !Off(dir) {
+		t.Fatalf("SetOff(true): %v, Off %v", err, Off(dir))
+	}
+	if err := SetOff(dir, false); err != nil || Off(dir) {
+		t.Fatalf("SetOff(false): %v, Off %v", err, Off(dir))
+	}
+	if err := SetOff(dir, false); err != nil {
+		t.Fatalf("SetOff(false) twice: %v", err)
+	}
+}

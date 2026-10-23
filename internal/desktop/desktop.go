@@ -250,3 +250,12 @@ func Watch(conn *dbus.Conn) error {
 	}
 	return nil
 }
+
+// Notify shows a desktop notification from bt-headset-hid over the session
+// bus conn.
+func Notify(conn *dbus.Conn, summary, body string) error {
+	obj := conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
+	return obj.Call("org.freedesktop.Notifications.Notify", 0,
+		"bt-headset-hid", uint32(0), "audio-headset", summary, body,
+		[]string{}, map[string]dbus.Variant{}, int32(-1)).Err
+}

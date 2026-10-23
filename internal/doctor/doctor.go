@@ -336,6 +336,24 @@ func Failed(fs []Finding) bool {
 	return false
 }
 
+// NewFailures returns the failures in fs whose text is not in before, and
+// the texts of all failures in fs, for the next call. The session service
+// notifies about each problem once, not again on every check.
+func NewFailures(before map[string]bool, fs []Finding) ([]Finding, map[string]bool) {
+	var fresh []Finding
+	now := map[string]bool{}
+	for _, f := range fs {
+		if f.Level != Fail {
+			continue
+		}
+		now[f.Text] = true
+		if !before[f.Text] {
+			fresh = append(fresh, f)
+		}
+	}
+	return fresh, now
+}
+
 // ModeFromUnit returns the mode the systemd unit of install.UnitFile runs
 // the daemon in; without -mode it is the default, ofono.
 func ModeFromUnit(unit []byte) string {

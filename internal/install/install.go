@@ -31,6 +31,9 @@ const (
 	// package manager owns it, so install uses it in place and uninstall
 	// leaves it alone.
 	PackagedBinary = "/usr/bin/bt-headset-hid"
+	// PackagedSessionUnit is the user service "bt-headset-hid session" the
+	// packages bring for every user (enabled with systemctl --global).
+	PackagedSessionUnit = "/usr/lib/systemd/user/bt-headset-hid-session.service"
 )
 
 // Options describe an installation.
@@ -162,7 +165,7 @@ func Plan(o Options) ([]Step, error) {
 func PlanUninstall(o Options) []Step {
 	var s []Step
 	if o.User != "" {
-		s = append(s, Step{Comment: "remove WirePlumber configuration of " + o.User, AsUser: []string{o.binary(), "wireplumber", "-remove"}})
+		s = append(s, Step{Comment: "remove WirePlumber configuration of " + o.User, AsUser: []string{o.binary(), "wireplumber", "-remove", "-uninstall"}})
 	}
 	s = append(s,
 		Step{Comment: "stop and disable the service", Try: []string{"systemctl", "disable", "--now", Service}},

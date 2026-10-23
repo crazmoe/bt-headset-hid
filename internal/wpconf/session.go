@@ -49,3 +49,32 @@ func RemoveSessionUnit(dir string) (bool, error) {
 	}
 	return err == nil, err
 }
+
+// OffPath is the file that says the user removed the setup with
+// "bt-headset-hid wireplumber -remove", below the configuration directory
+// dir. The session service, which the package starts for every user, then
+// leaves the user's PipeWire alone.
+func OffPath(dir string) string {
+	return filepath.Join(dir, "bt-headset-hid", "off")
+}
+
+// Off reports whether the user removed the setup.
+func Off(dir string) bool {
+	_, err := os.Stat(OffPath(dir))
+	return err == nil
+}
+
+// SetOff records whether the user removed the setup.
+func SetOff(dir string, off bool) error {
+	p := OffPath(dir)
+	if !off {
+		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(p, []byte("# bt-headset-hid wireplumber -remove: the session service leaves PipeWire alone.\n# To set it up again: bt-headset-hid wireplumber\n"), 0o644)
+}

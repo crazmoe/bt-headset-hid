@@ -171,3 +171,21 @@ func TestNoLongerPaired(t *testing.T) {
 	}
 	t.Error("no finding for the headset no longer paired")
 }
+
+func TestNewFailures(t *testing.T) {
+	f := healthy()
+	f.OFono, f.UHID = Active, false
+	fresh, seen := NewFailures(nil, Check(f, false))
+	if len(fresh) != 2 || len(seen) != 2 {
+		t.Fatalf("first check: %+v, %v", fresh, seen)
+	}
+	f.UHID = true
+	fresh, seen = NewFailures(seen, Check(f, false))
+	if len(fresh) != 0 || len(seen) != 1 {
+		t.Fatalf("one fixed: %+v, %v", fresh, seen)
+	}
+	f.UHID = false
+	if fresh, _ = NewFailures(seen, Check(f, false)); len(fresh) != 1 || !strings.Contains(fresh[0].Text, "uhid") {
+		t.Fatalf("back again: %+v", fresh)
+	}
+}

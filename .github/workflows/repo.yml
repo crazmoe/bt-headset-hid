@@ -1,0 +1,91 @@
+name: Package repository
+
+# Builds the apt and dnf repository from the deb and rpm packages of all
+# releases and publishes it on GitHub Pages. Setup: docs/REPOSITORY.md.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Signing key
+        env:
+          KEY: ${{ secrets.REPO_SIGNING_KEY }}
+        run: |
+          set -eu
+          if [ -z "$KEY" ]; then
+            echo "::error::secret REPO_SIGNING_KEY is missing, see docs/REPOSITORY.md"
+            exit 1
+          fi
+          printf '%s\n' "$KEY" | gpg --batch --import
+          fpr=$(gpg --batch --list-secret-keys --with-colons | awk -F: '/^fpr:/ { print $10; exit }')
+          echo "FPR=$fpr" >> "$GITHUB_ENV"
+          mkdir -p site/apt site/rpm
+          gpg --batch --armor --export "$fpr" > site/key.asc
+          if [ -f packaging/repo-key.asc ] && ! cmp -s site/key.asc packaging/repo-key.asc; then
+            echo "::warning::packaging/repo-key.asc is not the public part of REPO_SIGNING_KEY"
+          fi
+
+      - name: Packages of all releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          for tag in $(gh release list --limit 200 --json tagName --jq '.[].tagName'); do
+            gh release download "$tag" --pattern '*.deb' --dir site/apt || true
+            gh release download "$tag" --pattern '*.rpm' --dir site/rpm || true
+          done
+          ls site/apt site/rpm
+
+      - name: apt repository
+        working-directory: site/apt
+        run: |
+          set -eu
+          apt-ftparchive packages . > Packages
+          gzip -9k Packages
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin=bt-headset-hid \
+            -o APT::FTPArchive::Release::Label=bt-headset-hid \
+            release . > Release
+          gpg --batch --yes --local-user "$FPR" --clearsign --output InRelease Release
+          gpg --batch --yes --local-user "$FPR" --armor --detach-sign --output Release.gpg Release
+
+      - name: dnf repository
+        run: |
+          set -eu
+          sudo apt-get update -q
+          sudo apt-get install -y -q createrepo-c
+          createrepo_c site/rpm
+          gpg --batch --yes --local-user "$FPR" --armor --detach-sign --output site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
+          cp packaging/repo/bt-headset-hid.repo site/rpm/
+          sed -i 's|^gpgkey=.*|gpgkey=https://crazmoe.github.io/bt-headset-hid/key.asc|' site/rpm/bt-headset-hid.repo
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

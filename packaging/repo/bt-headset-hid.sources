@@ -1,0 +1,6 @@
+# Updates for bt-headset-hid, from its package repository on GitHub Pages.
+# Written by the bt-headset-hid package.
+Types: deb
+URIs: https://crazmoe.github.io/bt-headset-hid/apt/
+Suites: ./
+Signed-By: /usr/share/keyrings/bt-headset-hid.asc

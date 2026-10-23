@@ -74,6 +74,17 @@ turned off: when a call stream starts it would switch every Bluetooth headset, i
 bt-headset-hid does not serve. The loopbacks' side towards the headset is passive, so the call
 audio only runs while a program uses them.
 
+The deb and rpm packages ship the session as a user unit in `/usr/lib/systemd/user`, enabled
+for every user (`systemctl --global enable`); `postinst` runs `install -system-only` and starts
+the unit for the users logged in. At its start the session compares the user's WirePlumber mode
+with the mode of the system unit and, if they differ, sets up the user's PipeWire as
+`bt-headset-hid wireplumber` would (in mode hfp it then exits). The daemon needs no restart for
+that: while PipeWire still holds HFP, its registration fails and systemd starts it again every
+five seconds. `~/.config/bt-headset-hid/off`, written by `wireplumber -remove`, keeps the session
+from doing so. The session also shows desktop notifications (`org.freedesktop.Notifications`):
+when it set up PipeWire or a new headset, and for each new failure of the `doctor` checks, which
+it runs 30 seconds after the start and then every 30 minutes (`doctor.NewFailures`).
+
 Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
 passes an Active that follows Idle on to the modem only after one second, and drops it when
 another state comes first, so the headset does not see a call that ends at once.
@@ -103,7 +114,7 @@ PipeWire (or, in mode ofono, over HFP) is dropped, in case the headset reported 
 | `callswitch` | During a call: pause playing media players, switch headsets from A2DP to the phone profile, and back afterwards | none (behind an interface) |
 | `desktop` | I/O of `bt-headset-hid session`: `pw-dump`/`wpctl`, MPRIS on the session bus, the call state on the system bus (oFono name or modem) | commands, D-Bus |
 | `doctor` | `bt-headset-hid doctor`: findings with fixes from the facts gathered by the command (service, files, BlueZ, conflicting programs, PipeWire, WirePlumber configuration, log lines) | none |
-| `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner | files, commands |
+| `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner; the choice of the mode when none is given | files, commands |
 | `dbustest` | Private `dbus-daemon` for tests | process |
 
 ## HID reports

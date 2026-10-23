@@ -1,0 +1,9 @@
+# Updates for bt-headset-hid, from its package repository on GitHub Pages.
+# Written by the bt-headset-hid package.
+[bt-headset-hid]
+name=bt-headset-hid
+baseurl=https://crazmoe.github.io/bt-headset-hid/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=file:///usr/share/keyrings/bt-headset-hid.asc

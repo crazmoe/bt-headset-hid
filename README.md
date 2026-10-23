@@ -56,46 +56,22 @@ distribution overwrites it again; `install` notices that and asks you to rerun t
 
 Requirements: Linux with BlueZ and PipeWire with WirePlumber.
 
-1. **Download or build**
+1. **Install the package**
 
    The [releases page](https://github.com/crazmoe/bt-headset-hid/releases) has packages for
-   `amd64` and `arm64`. On Debian/Ubuntu or Fedora/openSUSE install the package, which puts the
-   program in `/usr/bin` (removing the package later also undoes step 2):
+   `amd64` and `arm64`. On Debian/Ubuntu or Fedora/openSUSE install the package:
 
    ```
    sudo apt install ./bt-headset-hid_*_amd64.deb      # Debian, Ubuntu
    sudo dnf install ./bt-headset-hid-*.x86_64.rpm     # Fedora (openSUSE: zypper install)
    ```
 
-   On other distributions take the tarball, unpack it and change into the folder:
-
-   ```
-   tar xzf bt-headset-hid_*_linux_amd64.tar.gz
-   cd bt-headset-hid_*_linux_amd64
-   ```
-
-   Or build it yourself with Go:
-
-   ```
-   go build ./cmd/bt-headset-hid
-   ```
-
-2. **Install**, from your normal desktop user with `sudo`:
-
-   ```
-   sudo bt-headset-hid install      # from the package
-   sudo ./bt-headset-hid install    # from the tarball or your own build
-   ```
-
-   It asks for the mode (or pass `-mode pipewire` / `-mode hfp` / `-mode ofono`) and then sets up
-   everything: the program in `/usr/local/bin`, the `uhid` kernel module, the udev rule that lets
-   softphones open the device, the systemd service with the chosen mode, for `pipewire` the D-Bus
-   policy and switching off ModemManager, for `ofono` the D-Bus policy and starting ModemManager
-   again, and the WirePlumber configuration of your user (0.4 or 0.5, detected automatically). In
-   `-mode pipewire` and `-mode ofono` it also creates a speaker and a microphone named
-   `bt-headset-hid` for the paired headset; if several are paired, it lists them and asks which
-   ones you use for calls (Enter takes the connected ones, or all). Run it again to switch modes;
-   `sudo bt-headset-hid uninstall` removes everything. At the end, check the setup as your normal
+   That is the whole setup. The package chooses the mode by itself (see step 2), sets up the system
+   service and then the PipeWire of each desktop user: right away for the users logged in, at
+   their next login for the others. A desktop notification says when it is ready. If several
+   headsets are paired, it sets up the connected ones, or all; `bt-headset-hid wireplumber`
+   chooses others. The package also adds its package repository, so later versions come with your
+   system updates. Removing the package undoes everything. Then check the setup as your normal
    user:
 
    ```
@@ -104,7 +80,38 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
 
    It checks the service, Bluetooth, the paired headsets, programs that get in the way (oFono,
    ModemManager, PulseAudio), PipeWire and your WirePlumber configuration, and prints the command
-   that fixes each problem it finds (in German if your desktop is set to German).
+   that fixes each problem it finds (in German if your desktop is set to German). The user service
+   runs the same checks now and then and shows a desktop notification for each new problem, with
+   the fix.
+
+2. **Without the package**, on other distributions, take the tarball, unpack it and change into
+   the folder, or build it yourself with Go:
+
+   ```
+   tar xzf bt-headset-hid_*_linux_amd64.tar.gz
+   cd bt-headset-hid_*_linux_amd64
+   go build ./cmd/bt-headset-hid                      # instead: build it yourself
+   ```
+
+   Then install it from your normal desktop user with `sudo`:
+
+   ```
+   sudo ./bt-headset-hid install
+   ```
+
+   It chooses the mode by itself and says which: `ofono`, unless the oFono service runs or your
+   PipeWire lacks the oFono backend; then `pipewire` if your PipeWire can (see above) and
+   ModemManager is not in use, otherwise `hfp`. Run again, it keeps the mode; `-mode pipewire`,
+   `-mode hfp` or `-mode ofono` chooses it yourself (also with the package:
+   `sudo bt-headset-hid install -mode hfp`). It sets up everything: the program in
+   `/usr/local/bin`, the `uhid` kernel module, the udev rule that lets softphones open the
+   device, the systemd service with the mode, for `pipewire` the D-Bus policy and switching off
+   ModemManager, for `ofono` the D-Bus policy and starting ModemManager again, and the WirePlumber
+   configuration of your user (0.4 or 0.5, detected automatically). In `-mode pipewire` and
+   `-mode ofono` it also creates a speaker and a microphone named `bt-headset-hid` for the paired
+   headset; if several are paired, it lists them and asks which ones you use for calls (Enter
+   takes the connected ones, or all). `sudo bt-headset-hid uninstall` removes everything. At the
+   end, check the setup with `bt-headset-hid doctor` as in step 1.
 
 3. **Connect the headset** as usual (`bluetoothctl` or your desktop; reconnect it if it was
    already connected). `bt-headset-hid doctor` should now list it as connected; the log is in
@@ -115,9 +122,9 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    (`journalctl --user -u bt-headset-hid-session -f`). In `-mode ofono` it switches only once you
    answer, and only the headset you answer on; while it rings, the headsets beep themselves.
    Players are paused through MPRIS, which most players and browsers support. A headset you pair
-   after `install` is set up by itself a few seconds after pairing, without any restart (the user
-   service's log says `newly paired headset ... set up`). Headsets that were
-   already paired at `install` and that you did not choose stay left out. A headset you unpair
+   later is set up by itself a few seconds after pairing, without any restart (a notification
+   says so, the user service's log `newly paired headset ... set up`). Headsets that were already
+   paired at the setup and that it did not set up stay left out. A headset you unpair
    (remove in the Bluetooth settings) is taken out by itself, without a restart, and is not set up
    again if you pair it again.
 
@@ -134,13 +141,15 @@ What `install` does, step by step, if you prefer to do it yourself:
 - PipeWire: `bt-headset-hid wireplumber -mode pipewire` (or `-mode hfp`, `-mode ofono`) as your normal user.
   It detects the WirePlumber version, writes the matching file (0.4: Lua in
   `~/.config/wireplumber/bluetooth.lua.d/`, 0.5 and later: `~/.config/wireplumber/wireplumber.conf.d/`),
-  removes the file of the other version and restarts PipeWire; `-remove` undoes it. Without `-mode`
+  removes the file of the other version and restarts PipeWire; `-remove` undoes it, and the user service of the package leaves your PipeWire
+  alone from then on, until you run `bt-headset-hid wireplumber` again. Without `-mode`
   it keeps the mode set up before. By hand: copy
   the matching file from `contrib/wireplumber/` to the path written in its first lines.
   In `-mode pipewire` and `-mode ofono` it also sets up the headsets: their list goes to
   `~/.config/bt-headset-hid/headsets`, `~/.config/pipewire/pipewire.conf.d/51-bt-headset-hid.conf`
   adds the `bt-headset-hid` speaker and microphone, and the user service
-  `~/.config/systemd/user/bt-headset-hid-session.service` switches the headsets to the phone
+  `~/.config/systemd/user/bt-headset-hid-session.service` (with the package
+  `/usr/lib/systemd/user/bt-headset-hid-session.service`, for every user) switches the headsets to the phone
   profile for calls and points the `bt-headset-hid` speaker and microphone at the call audio of
   the one connected, while everything runs, so changing the list needs no restart (with two
   connected, the call goes to the one you answer or dial on in `-mode ofono`, so the default output
