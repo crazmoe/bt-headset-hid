@@ -37,6 +37,8 @@ func TestContent(t *testing.T) {
 		{"pipewire", Version{0, 4}, `["bluez5.hfphsp-backend-native-modem"] = "any"`},
 		{"hfp", Version{0, 5}, `bluez5.roles = [ a2dp_sink a2dp_source ]`},
 		{"pipewire", Version{0, 5}, `bluez5.hfphsp-backend-native-modem = "any"`},
+		{"ofono", Version{0, 4}, `bluez_monitor.properties["bluez5.hfphsp-backend"] = "ofono"`},
+		{"ofono", Version{0, 5}, `bluez5.hfphsp-backend = "ofono"`},
 	} {
 		b, err := Content(c.mode, c.v)
 		if err != nil || !strings.Contains(string(b), c.want) {

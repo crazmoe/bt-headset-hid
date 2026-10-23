@@ -14,7 +14,9 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/crazmoe/bt-headset-hid/internal/callswitch"
+	"github.com/crazmoe/bt-headset-hid/internal/hfp"
 	"github.com/crazmoe/bt-headset-hid/internal/modem"
+	"github.com/crazmoe/bt-headset-hid/internal/ofono"
 )
 
 // System is the callswitch.Env of a user session.
@@ -122,12 +124,23 @@ func (s System) Play(player string) error {
 	return s.Session.Object(player, mprisPath).Call(mprisPlayer+".Play", 0).Err
 }
 
-// InCall reports whether the ModemManager modem on the system bus conn, which
-// is the bt-headset-hid daemon in mode pipewire, has a call that rings, is
-// being dialled or is going on. Without the modem there is no call.
+// InCall reports whether the bt-headset-hid daemon on the system bus conn
+// sees a call that rings, is being dialled or is going on. In mode ofono it
+// publishes the call state under the oFono name; in mode pipewire it is the
+// ModemManager modem. Without either there is no call.
 func InCall(conn *dbus.Conn) (bool, error) {
-	// Without NoAutoStart the bus would try to start ModemManager, and
-	// systemd answers that it has no such unit.
+	// Without NoAutoStart the bus would try to start oFono or ModemManager,
+	// and systemd answers that it has no such unit.
+	noOwner := func(err error) bool {
+		e, ok := err.(dbus.Error)
+		return ok && (e.Name == "org.freedesktop.DBus.Error.ServiceUnknown" || e.Name == "org.freedesktop.DBus.Error.NameHasNoOwner")
+	}
+	var st string
+	err := conn.Object(ofono.Service, ofono.StatusPath).
+		Call("org.freedesktop.DBus.Properties.Get", dbus.FlagNoAutoStart, ofono.StatusIface, "CallState").Store(&st)
+	if err == nil {
+		return st != hfp.Idle.String(), nil
+	}
 	get := func(path dbus.ObjectPath, iface, prop string) (dbus.Variant, error) {
 		var v dbus.Variant
 		err := conn.Object(modem.Service, path).
@@ -136,7 +149,7 @@ func InCall(conn *dbus.Conn) (bool, error) {
 	}
 	v, err := get(modem.ModemPath, modem.Service+".Modem.Voice", "Calls")
 	if err != nil {
-		if e, ok := err.(dbus.Error); ok && (e.Name == "org.freedesktop.DBus.Error.ServiceUnknown" || e.Name == "org.freedesktop.DBus.Error.NameHasNoOwner") {
+		if noOwner(err) {
 			return false, nil
 		}
 		return false, err
@@ -154,15 +167,22 @@ func InCall(conn *dbus.Conn) (bool, error) {
 	return false, nil
 }
 
-// Watch subscribes conn to the signals of the modem and of its name, so a
-// caller reading conn's signal channel learns when to check InCall again.
+// Watch subscribes conn to the signals of the daemon (as oFono or as the
+// modem) and of its names, so a caller reading conn's signal channel learns
+// when to check InCall again.
 func Watch(conn *dbus.Conn) error {
-	if err := conn.AddMatchSignal(dbus.WithMatchSender(modem.Service)); err != nil {
-		return err
+	for _, name := range []string{ofono.Service, modem.Service} {
+		if err := conn.AddMatchSignal(dbus.WithMatchSender(name)); err != nil {
+			return err
+		}
+		err := conn.AddMatchSignal(
+			dbus.WithMatchInterface("org.freedesktop.DBus"),
+			dbus.WithMatchMember("NameOwnerChanged"),
+			dbus.WithMatchArg(0, name),
+		)
+		if err != nil {
+			return err
+		}
 	}
-	return conn.AddMatchSignal(
-		dbus.WithMatchInterface("org.freedesktop.DBus"),
-		dbus.WithMatchMember("NameOwnerChanged"),
-		dbus.WithMatchArg(0, modem.Service),
-	)
+	return nil
 }

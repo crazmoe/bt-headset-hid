@@ -52,10 +52,10 @@ func Paths(dir string, v Version) (target, other string) {
 	return conf, lua
 }
 
-// Content returns the configuration for mode ("pipewire" or "hfp") in the
-// format of v.
+// Content returns the configuration for mode ("pipewire", "hfp" or
+// "ofono") in the format of v.
 func Content(mode string, v Version) ([]byte, error) {
-	if mode != "pipewire" && mode != "hfp" {
+	if mode != "pipewire" && mode != "hfp" && mode != "ofono" {
 		return nil, fmt.Errorf("wpconf: unknown mode %q", mode)
 	}
 	ext := ".conf"

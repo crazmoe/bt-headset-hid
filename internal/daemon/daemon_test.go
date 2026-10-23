@@ -184,3 +184,101 @@ func TestSession(t *testing.T) {
 		t.Fatal("Run did not end")
 	}
 }
+
+func TestSessionCodec(t *testing.T) {
+	ours, theirs := net.Pipe()
+	h := headset{t, theirs, bufio.NewReader(theirs)}
+	events := make(chan hfp.Event, 4)
+	s := NewSession(ours, hfp.HFP, hfp.DefaultFeatures|hfp.FeatureCodecNegotiation, func(e hfp.Event) { events <- e }, nil)
+	connected := make(chan struct{}, 2)
+	s.OnConnected(func() { connected <- struct{}{} })
+	go s.Run()
+	defer theirs.Close()
+
+	h.send("AT+BRSF=959")
+	h.expect("+BRSF: 548", "OK")
+	h.send("AT+BAC=1,2")
+	h.expect("OK")
+	h.send("AT+CIND=?")
+	h.expect(`+CIND: ("service",(0,1)),("call",(0,1)),("callsetup",(0-3)),("callheld",(0-2)),("signal",(0-5)),("roam",(0,1)),("battchg",(0-5))`, "OK")
+	select {
+	case <-connected:
+		t.Fatal("connected before AT+CMER")
+	default:
+	}
+	h.send("AT+CMER=3,0,0,1")
+	h.expect("OK")
+	<-connected
+
+	type result struct {
+		codec int
+		err   error
+	}
+	negotiate := func(timeout time.Duration, allowed ...int) chan result {
+		ch := make(chan result, 1)
+		go func() {
+			c, err := s.NegotiateCodec(allowed, timeout)
+			ch <- result{c, err}
+		}()
+		return ch
+	}
+
+	// mSBC, confirmed.
+	res := negotiate(5*time.Second, hfp.CodecCVSD, hfp.CodecMSBC)
+	h.expect("+BCS: 2")
+	h.send("AT+BCS=2")
+	h.expect("OK")
+	if r := <-res; r.codec != hfp.CodecMSBC || r.err != nil {
+		t.Fatalf("NegotiateCodec = %+v", r)
+	}
+
+	// The headset refuses mSBC; CVSD next.
+	res = negotiate(5*time.Second, hfp.CodecCVSD, hfp.CodecMSBC)
+	h.expect("+BCS: 2")
+	h.send("AT+BAC=1")
+	h.expect("OK", "+BCS: 1")
+	h.send("AT+BCS=1")
+	h.expect("OK")
+	if r := <-res; r.codec != hfp.CodecCVSD || r.err != nil {
+		t.Fatalf("NegotiateCodec after refusal = %+v", r)
+	}
+
+	// No answer at all: CVSD anyway.
+	h.send("AT+BAC=1,2")
+	h.expect("OK")
+	res = negotiate(100*time.Millisecond, hfp.CodecCVSD, hfp.CodecMSBC)
+	h.expect("+BCS: 2", "+BCS: 1")
+	if r := <-res; r.codec != hfp.CodecCVSD || r.err != nil {
+		t.Fatalf("NegotiateCodec without answer = %+v", r)
+	}
+	// A late answer is an error, not a codec.
+	h.send("AT+BCS=1")
+	h.expect("ERROR")
+
+	select {
+	case e := <-events:
+		t.Fatalf("codec answers reached the bridge: %+v", e)
+	default:
+	}
+	select {
+	case <-connected:
+		t.Fatal("OnConnected called twice")
+	default:
+	}
+}
+
+// TestSessionConnectedHSP: HSP needs no handshake, so the headset can take
+// part in calls at once.
+func TestSessionConnectedHSP(t *testing.T) {
+	ours, theirs := net.Pipe()
+	defer theirs.Close()
+	s := NewSession(ours, hfp.HSP, hfp.DefaultFeatures, nil, nil)
+	connected := make(chan struct{}, 1)
+	s.OnConnected(func() { connected <- struct{}{} })
+	go s.Run()
+	select {
+	case <-connected:
+	case <-time.After(5 * time.Second):
+		t.Fatal("OnConnected not called")
+	}
+}

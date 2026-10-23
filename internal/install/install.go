@@ -1,5 +1,5 @@
 // Package install sets up bt-headset-hid on the host: binary, systemd
-// service, udev rule, D-Bus policy (mode pipewire) and, as the invoking user,
+// service, udev rule, D-Bus policy (modes pipewire and ofono) and, as the invoking user,
 // the WirePlumber configuration. Plan builds the steps without side effects
 // so they can be tested; Apply carries them out.
 package install
@@ -35,7 +35,7 @@ const (
 
 // Options describe an installation.
 type Options struct {
-	Mode string // "pipewire" or "hfp"
+	Mode string // "pipewire", "hfp" or "ofono"
 	// Self is the running executable, copied to Binary unless it is
 	// PackagedBinary.
 	Self string
@@ -80,7 +80,7 @@ After=bluetooth.service dbus.service
 Wants=bluetooth.service
 
 [Service]
-# Switch modes with "sudo bt-headset-hid install -mode hfp" (or pipewire).
+# Switch modes with "sudo bt-headset-hid install -mode hfp" (or pipewire, ofono).
 ExecStart=` + bin + ` -mode ` + mode + `
 Restart=on-failure
 RestartSec=5
@@ -100,7 +100,7 @@ func asset(name string) []byte {
 
 // Plan returns the steps that install bt-headset-hid for o.Mode.
 func Plan(o Options) ([]Step, error) {
-	if o.Mode != "pipewire" && o.Mode != "hfp" {
+	if o.Mode != "pipewire" && o.Mode != "hfp" && o.Mode != "ofono" {
 		return nil, fmt.Errorf("install: unknown mode %q", o.Mode)
 	}
 	var s []Step
@@ -118,12 +118,18 @@ func Plan(o Options) ([]Step, error) {
 		Step{Comment: "udev rule for /dev/hidrawN access", Write: &File{Path: UdevRule, Data: asset("70-bt-headset-hid.rules"), Perm: 0o644}},
 		Step{Try: []string{"udevadm", "control", "--reload"}},
 	)
-	if o.Mode == "pipewire" {
+	switch o.Mode {
+	case "pipewire":
 		s = append(s,
 			Step{Comment: "D-Bus policy for the ModemManager name", Write: &File{Path: DBusPolicy, Data: asset("bt-headset-hid.conf"), Perm: 0o644}},
 			Step{Comment: "stop ModemManager (it would own the same bus name)", Try: []string{"systemctl", "disable", "--now", "ModemManager.service"}},
 		)
-	} else {
+	case "ofono":
+		s = append(s,
+			Step{Comment: "D-Bus policy for the oFono name", Write: &File{Path: DBusPolicy, Data: asset("bt-headset-hid-ofono.conf"), Perm: 0o644}},
+			Step{Comment: "start ModemManager again if mode pipewire stopped it (mobile broadband)", Try: []string{"systemctl", "enable", "--now", "ModemManager.service"}},
+		)
+	default:
 		s = append(s, Step{Remove: DBusPolicy})
 	}
 	s = append(s,

@@ -20,9 +20,13 @@ type Session struct {
 	onEvent func(hfp.Event)
 	logf    func(format string, args ...any)
 
-	mu      sync.Mutex // guards ag, writes to conn and ringing
-	ag      *hfp.AG
-	ringing chan struct{} // closed to stop the ring loop; nil when not ringing
+	mu          sync.Mutex // guards ag, writes to conn, ringing, codec and onConnected
+	ag          *hfp.AG
+	ringing     chan struct{} // closed to stop the ring loop; nil when not ringing
+	codec       chan int      // receives the answer to a codec proposal; nil when none is open
+	onConnected func()
+
+	negotiate sync.Mutex // one codec negotiation at a time
 }
 
 // NewSession returns a session on conn. onEvent receives the headset's
@@ -43,9 +47,23 @@ func (s *Session) write(lines []string) error {
 	return err
 }
 
+// OnConnected sets a function called once, from Run, when the service level
+// connection is established and the headset can take part in calls.
+func (s *Session) OnConnected(f func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onConnected = f
+}
+
 // Run reads AT commands until the connection ends, answers them and reports
 // events. It returns nil when the headset disconnects.
 func (s *Session) Run() error {
+	s.mu.Lock()
+	connected := s.ag.Connected()
+	s.mu.Unlock()
+	if connected {
+		s.connected()
+	}
 	defer s.Close()
 	r := atparser.NewReader(s.conn)
 	for {
@@ -72,6 +90,11 @@ func (s *Session) Run() error {
 			reply = s.ag.Handle(cmd)
 		}
 		err = s.write(reply.Lines)
+		nowConnected := !connected && s.ag.Connected()
+		var codec chan int
+		if reply.Event != nil && reply.Event.Kind == hfp.CodecSelected {
+			codec, s.codec = s.codec, nil
+		}
 		s.mu.Unlock()
 		if err != nil {
 			return err
@@ -79,9 +102,71 @@ func (s *Session) Run() error {
 		if perr != nil {
 			s.logf("unparsable AT line %q", line)
 		}
-		if reply.Event != nil && s.onEvent != nil {
+		if nowConnected {
+			connected = true
+			s.connected()
+		}
+		switch {
+		case reply.Event == nil:
+		case reply.Event.Kind == hfp.CodecSelected:
+			if codec != nil {
+				codec <- reply.Event.Value
+			}
+		case s.onEvent != nil:
 			s.onEvent(*reply.Event)
 		}
+	}
+}
+
+func (s *Session) connected() {
+	s.mu.Lock()
+	f := s.onConnected
+	s.mu.Unlock()
+	if f != nil {
+		f()
+	}
+}
+
+// NegotiateCodec agrees with the headset on the codec for the next audio
+// link, out of allowed (CVSD is always possible), and returns it. Without
+// codec negotiation that is CVSD. If the headset refuses mSBC or does not
+// answer within timeout, it tries CVSD; if that gets no answer either, it
+// returns CVSD anyway, which headsets accept without negotiation. Run must
+// be running to receive the answer.
+func (s *Session) NegotiateCodec(allowed []int, timeout time.Duration) (int, error) {
+	s.negotiate.Lock()
+	defer s.negotiate.Unlock()
+	for {
+		ch := make(chan int, 1)
+		s.mu.Lock()
+		line, codec := s.ag.ProposeCodec(allowed...)
+		if line == "" {
+			s.mu.Unlock()
+			return codec, nil
+		}
+		s.codec = ch
+		err := s.write([]string{line})
+		s.mu.Unlock()
+		if err != nil {
+			return 0, err
+		}
+		var got int
+		select {
+		case got = <-ch:
+		case <-time.After(timeout):
+			s.mu.Lock()
+			s.ag.CancelProposal()
+			s.codec = nil
+			s.mu.Unlock()
+			s.logf("headset did not answer the codec proposal %d", codec)
+		}
+		switch {
+		case got == codec:
+			return codec, nil
+		case codec == hfp.CodecCVSD:
+			return hfp.CodecCVSD, nil
+		}
+		allowed = []int{hfp.CodecCVSD}
 	}
 }
 

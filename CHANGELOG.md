@@ -8,6 +8,15 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
+## Unreleased
+
+- New mode `ofono`: bt-headset-hid handles the headset itself as in mode hfp (all buttons,
+  including redial and volume) and poses as oFono, so PipeWire's oFono backend fetches the call
+  audio from it, in wideband (mSBC) where headset and adapter support it. ModemManager keeps
+  running, so mobile broadband (WWAN) works next to bt-headset-hid, and PipeWire 1.0 needs no
+  fix. Several headsets can be connected at once. `install -mode ofono` sets it up and starts
+  ModemManager again if mode pipewire had stopped it.
+
 ## 0.3.0
 
 - pipewire mode: only the headset bt-headset-hid serves starts in the phone profile; other

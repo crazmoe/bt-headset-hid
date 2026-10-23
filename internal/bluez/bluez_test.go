@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/godbus/dbus/v5/prop"
 
 	"github.com/crazmoe/bt-headset-hid/internal/dbustest"
 	"github.com/crazmoe/bt-headset-hid/internal/hfp"
@@ -163,5 +164,34 @@ func TestProfileInUse(t *testing.T) {
 	_, err := Register(dbustest.Connect(t, addr), hfp.DefaultFeatures, hfp.HFP, hfp.HSP)
 	if !errors.Is(err, ErrProfileInUse) {
 		t.Fatalf("second Register: %v", err)
+	}
+}
+
+func TestSpecWideband(t *testing.T) {
+	if f := spec(hfp.HFP, hfp.DefaultFeatures).opts["Features"].Value(); f != uint16(hfp.DefaultFeatures&0x1f) {
+		t.Errorf("features = %v", f)
+	}
+	f := spec(hfp.HFP, hfp.DefaultFeatures|hfp.FeatureCodecNegotiation).opts["Features"].Value()
+	if f != uint16(hfp.DefaultFeatures&0x1f|0x20) {
+		t.Errorf("features with codec negotiation = %v, want wideband speech (0x20) too", f)
+	}
+}
+
+func TestLocalAddress(t *testing.T) {
+	addr := dbustest.Bus(t)
+	bluez, _ := fakeBlueZ(t, addr)
+	_, err := prop.Export(bluez, "/org/bluez/hci0", prop.Map{
+		"org.bluez.Adapter1": {"Address": {Value: "00:1a:7d:da:71:13"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn := dbustest.Connect(t, addr)
+	got, err := LocalAddress(conn, "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF")
+	if err != nil || got != "00:1A:7D:DA:71:13" {
+		t.Fatalf("LocalAddress = %q, %v", got, err)
+	}
+	if _, err := LocalAddress(conn, "/org/bluez/hci1/dev_AA_BB_CC_DD_EE_FF"); err == nil {
+		t.Fatal("no error for a missing adapter")
 	}
 }

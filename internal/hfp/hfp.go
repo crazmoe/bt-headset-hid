@@ -30,7 +30,22 @@ const (
 	FeatureInBandRing       = 1 << 3
 	FeatureVoiceTag         = 1 << 4
 	FeatureRejectCall       = 1 << 5
+	// FeatureCodecNegotiation lets the AG choose the audio codec with +BCS
+	// before it opens the audio link; needed for wideband speech (mSBC).
+	FeatureCodecNegotiation = 1 << 9
 )
+
+// hfCodecNegotiation is the HF feature bit (AT+BRSF) for codec negotiation.
+const hfCodecNegotiation = 1 << 7
+
+// Audio codec IDs (AT+BAC, +BCS).
+const (
+	CodecCVSD = 1 // narrowband, 8 kHz
+	CodecMSBC = 2 // wideband, 16 kHz
+)
+
+// maxCodecs bounds the codec list a headset may send with AT+BAC.
+const maxCodecs = 8
 
 // DefaultFeatures are the AG features we announce: the headset may start voice
 // recognition (often bound to a long press) and reject calls. Three-way
@@ -57,12 +72,16 @@ const (
 	SpeakerGain
 	// MicGain: AT+VGM, Value is 0..15.
 	MicGain
+	// CodecSelected answers a codec proposal (see ProposeCodec): Value is
+	// the codec the headset confirmed with AT+BCS, or 0 if it sent its
+	// codec list again with AT+BAC instead, which means no.
+	CodecSelected
 )
 
 var eventNames = map[EventKind]string{
 	Answer: "answer", HangUp: "hangup", Button: "button", Redial: "redial",
 	Dial: "dial", VoiceRecognition: "voice-recognition",
-	SpeakerGain: "speaker-gain", MicGain: "mic-gain",
+	SpeakerGain: "speaker-gain", MicGain: "mic-gain", CodecSelected: "codec-selected",
 }
 
 func (k EventKind) String() string {
@@ -133,6 +152,8 @@ type AG struct {
 	state      CallState
 	speaker    int
 	mic        int
+	hfCodecs   []int // from AT+BAC
+	proposed   int   // codec sent with +BCS and not yet answered, or 0
 }
 
 // New returns an AG for the given profile announcing the given features.
@@ -219,7 +240,20 @@ func (ag *AG) Handle(c atparser.Command) Reply {
 		return errReply()
 
 	// Settings the headset may send; accepted without effect.
-	case "+CMEE", "+CLIP", "+CCWA", "+NREC", "+BIA", "+BAC", "+BIEV", "+BCS", "+BCC",
+	case "+BAC":
+		return ag.codecList(c)
+	case "+BCS":
+		if c.Type != atparser.Set {
+			return errReply()
+		}
+		n, err := strconv.Atoi(c.Args)
+		if err != nil || ag.proposed == 0 || n != ag.proposed {
+			return errReply()
+		}
+		ag.proposed = 0
+		return event(Event{Kind: CodecSelected, Value: n})
+
+	case "+CMEE", "+CLIP", "+CCWA", "+NREC", "+BIA", "+BIEV", "+BCC",
 		"+XAPL", "+IPHONEACCEV", "+XEVENT", "+CSRSF", "+CSRBATT":
 		if c.Type == atparser.Set || c.Type == atparser.Exec {
 			return ok()
@@ -281,6 +315,63 @@ func (ag *AG) Handle(c atparser.Command) Reply {
 		return event(Event{Kind: MicGain, Value: n})
 	}
 	return errReply()
+}
+
+// codecList handles AT+BAC, the codecs the headset supports.
+func (ag *AG) codecList(c atparser.Command) Reply {
+	p := c.Params()
+	if c.Type != atparser.Set || len(p) == 0 || len(p) > maxCodecs {
+		return errReply()
+	}
+	codecs := make([]int, 0, len(p))
+	for _, s := range p {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > 255 {
+			return errReply()
+		}
+		codecs = append(codecs, n)
+	}
+	ag.hfCodecs = codecs
+	if ag.proposed != 0 {
+		ag.proposed = 0
+		return event(Event{Kind: CodecSelected})
+	}
+	return ok()
+}
+
+// CodecNegotiation reports whether both sides support codec negotiation.
+func (ag *AG) CodecNegotiation() bool {
+	return ag.profile == HFP && ag.features&FeatureCodecNegotiation != 0 && ag.hfFeatures&hfCodecNegotiation != 0
+}
+
+// ProposeCodec picks the audio codec for the next audio link from allowed
+// (codec IDs the audio side can handle; CVSD is always possible). Without
+// codec negotiation it returns CVSD and no line. Otherwise it returns the
+// best codec both sides support and the +BCS line that proposes it; the
+// headset answers with AT+BCS (Event CodecSelected) and the audio link may
+// be opened only after that.
+func (ag *AG) ProposeCodec(allowed ...int) (line string, codec int) {
+	if !ag.CodecNegotiation() {
+		return "", CodecCVSD
+	}
+	codec = CodecCVSD
+	if contains(allowed, CodecMSBC) && contains(ag.hfCodecs, CodecMSBC) {
+		codec = CodecMSBC
+	}
+	ag.proposed = codec
+	return fmt.Sprintf("+BCS: %d", codec), codec
+}
+
+// CancelProposal forgets an unanswered codec proposal.
+func (ag *AG) CancelProposal() { ag.proposed = 0 }
+
+func contains(list []int, v int) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }
 
 func validNumber(s string) bool {

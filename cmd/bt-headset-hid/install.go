@@ -23,13 +23,13 @@ func runInstall(args []string, uninstall bool) error {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	mode := ""
 	if !uninstall {
-		fs.StringVar(&mode, "mode", "", `"pipewire": PipeWire keeps HFP and the audio; "hfp": all buttons, no call audio (asked if not given)`)
+		fs.StringVar(&mode, "mode", "", `"pipewire": PipeWire keeps HFP and the audio; "hfp": all buttons, no call audio; "ofono": all buttons and call audio, ModemManager stays free (asked if not given)`)
 	}
 	fs.Usage = func() {
 		if uninstall {
 			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid uninstall")
 		} else {
-			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid install [-mode pipewire|hfp]")
+			fmt.Fprintln(fs.Output(), "usage: sudo bt-headset-hid install [-mode pipewire|hfp|ofono]")
 		}
 		fs.PrintDefaults()
 	}
@@ -49,7 +49,7 @@ func runInstall(args []string, uninstall bool) error {
 		out, _ := exec.Command("pipewire", "--version").CombinedOutput()
 		switch err := install.CheckPipeWire(string(out), ""); {
 		case errors.Is(err, install.ErrPipeWireTooOld):
-			return fmt.Errorf("%v.\nUse \"sudo bt-headset-hid install -mode hfp\", update PipeWire or run the fix (see README)", err)
+			return fmt.Errorf("%v.\nUse \"sudo bt-headset-hid install -mode ofono\" (or hfp), update PipeWire or run the fix (see README)", err)
 		case err != nil:
 			fmt.Println("WARNING:", err, "- -mode pipewire needs PipeWire 1.2 or later")
 		}
@@ -84,7 +84,7 @@ func runInstall(args []string, uninstall bool) error {
 	}
 
 	if uninstall {
-		fmt.Println("bt-headset-hid removed. If you use ModemManager: sudo systemctl enable --now ModemManager")
+		fmt.Println("bt-headset-hid removed. If you use ModemManager and mode pipewire stopped it: sudo systemctl enable --now ModemManager")
 		return nil
 	}
 	fmt.Println("bt-headset-hid installed in mode", mode+". Reconnect the headset, then check:")
@@ -97,22 +97,25 @@ func askMode(in io.Reader) (string, error) {
 	fmt.Println("Which mode?")
 	fmt.Println("  1) pipewire: talk through the headset; answer and hang up work (recommended)")
 	fmt.Println("  2) hfp:      all buttons (redial, volume) work, but no call audio through the headset")
+	fmt.Println("  3) ofono:    talk through the headset with all buttons; mobile broadband (ModemManager) keeps working (new)")
 	r := bufio.NewReader(in)
 	for {
-		fmt.Print("Choose 1 or 2 [1]: ")
+		fmt.Print("Choose 1, 2 or 3 [1]: ")
 		line, err := r.ReadString('\n')
 		answer := strings.TrimSpace(line)
 		if err != nil && answer == "" {
-			return "", errors.New("no mode chosen; use -mode pipewire or -mode hfp")
+			return "", errors.New("no mode chosen; use -mode pipewire, hfp or ofono")
 		}
 		switch answer {
 		case "", "1", "pipewire":
 			return "pipewire", nil
 		case "2", "hfp":
 			return "hfp", nil
+		case "3", "ofono":
+			return "ofono", nil
 		}
 		if err != nil {
-			return "", errors.New("no mode chosen; use -mode pipewire or -mode hfp")
+			return "", errors.New("no mode chosen; use -mode pipewire, hfp or ofono")
 		}
 	}
 }
