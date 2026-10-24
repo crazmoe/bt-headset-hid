@@ -83,6 +83,13 @@ func TestInCallOFono(t *testing.T) {
 		t.Fatalf("answered: InCall = %v, %+v, %v", in, r, err)
 	}
 	srv.SetCallDevice("")
+	if b := Batteries(watcher); len(b) != 0 {
+		t.Fatalf("Batteries without any = %v", b)
+	}
+	srv.SetBattery("84:d3:52:8c:b9:d0", 40)
+	if b := Batteries(watcher); len(b) != 1 || b["84:D3:52:8C:B9:D0"] != 40 {
+		t.Fatalf("Batteries = %v", b)
+	}
 	for _, step := range []struct {
 		state hfp.CallState
 		want  bool

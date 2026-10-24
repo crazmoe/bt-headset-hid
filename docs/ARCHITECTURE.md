@@ -91,6 +91,11 @@ menu, as KDE, Xfce, Cinnamon, MATE, LXQt, waybar and GNOME with the AppIndicator
 them; without a tray nothing is shown. `tray` builds icon, tooltip and menu from the state (mode,
 paired headsets and which are set up, call, failures of the last check); `desktop.Tray` exports
 it. Ticking a headset in the menu writes the headset list as `-headset` would, without a restart.
+The menu shows the battery level from `org.bluez.Battery1`, or in mode ofono from the daemon's
+`Batteries` property, and the session warns once below 20 % (`tray.LowBatteries`). In modes hfp
+and ofono the daemon announces HF indicators and Apple's accessory battery reports, turns the
+`AT+BIEV`, `AT+IPHONEACCEV` and `AT+XEVENT=BATTERY` reports into `hfp.Battery` events and hands
+them to BlueZ as a battery provider (`bluez.Batteries`, `org.bluez.BatteryProviderManager1`).
 
 Some softphones set the Off-Hook LED for a moment before Ring when a call comes in. The daemon
 passes an Active that follows Idle on to the modem only after one second, and drops it when

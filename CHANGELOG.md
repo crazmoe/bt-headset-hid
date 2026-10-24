@@ -8,6 +8,14 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
+## Unreleased
+
+- Battery level of the headsets: in modes ofono and hfp the daemon reads it from the headset
+  (HFP indicators `AT+BIEV`, Apple's `AT+IPHONEACCEV`, Plantronics' `AT+XEVENT=BATTERY`) and
+  reports it to BlueZ as a battery provider, so the desktop's Bluetooth settings show it; in mode
+  ofono it is also published for the user service. The tray menu shows it next to each connected
+  headset, and a notification warns once below 20 %.
+
 ## 0.6.0
 
 - The user service no longer keeps a CPU core about 15 % busy: it answered every change in

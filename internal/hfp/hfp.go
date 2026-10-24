@@ -33,6 +33,9 @@ const (
 	// FeatureCodecNegotiation lets the AG choose the audio codec with +BCS
 	// before it opens the audio link; needed for wideband speech (mSBC).
 	FeatureCodecNegotiation = 1 << 9
+	// FeatureHFIndicators lets the headset report HF indicators with
+	// AT+BIEV, here its battery level.
+	FeatureHFIndicators = 1 << 10
 )
 
 // hfCodecNegotiation is the HF feature bit (AT+BRSF) for codec negotiation.
@@ -48,9 +51,23 @@ const (
 const maxCodecs = 8
 
 // DefaultFeatures are the AG features we announce: the headset may start voice
-// recognition (often bound to a long press) and reject calls. Three-way
-// calling is not announced so the handshake ends after AT+CMER.
-const DefaultFeatures = FeatureVoiceRecognition | FeatureRejectCall
+// recognition (often bound to a long press), reject calls and report its
+// battery level. Three-way calling is not announced so the handshake ends
+// after AT+CMER.
+const DefaultFeatures = FeatureVoiceRecognition | FeatureRejectCall | FeatureHFIndicators
+
+// HF indicators (AT+BIND, AT+BIEV).
+const (
+	indicatorSafety  = 1 // enhanced safety, accepted and ignored
+	indicatorBattery = 2 // battery level 0..100
+)
+
+// xaplFeatures are the Apple accessory features we accept (AT+XAPL): bit 1,
+// battery level reports with AT+IPHONEACCEV.
+const xaplFeatures = 2
+
+// maxAccEvents bounds the key/value pairs of one AT+IPHONEACCEV.
+const maxAccEvents = 8
 
 // EventKind identifies a headset action.
 type EventKind int
@@ -76,12 +93,16 @@ const (
 	// the codec the headset confirmed with AT+BCS, or 0 if it sent its
 	// codec list again with AT+BAC instead, which means no.
 	CodecSelected
+	// Battery: the headset's battery level, Value is 0..100 (AT+BIEV,
+	// AT+IPHONEACCEV or AT+XEVENT=BATTERY).
+	Battery
 )
 
 var eventNames = map[EventKind]string{
 	Answer: "answer", HangUp: "hangup", Button: "button", Redial: "redial",
 	Dial: "dial", VoiceRecognition: "voice-recognition",
 	SpeakerGain: "speaker-gain", MicGain: "mic-gain", CodecSelected: "codec-selected",
+	Battery: "battery",
 }
 
 func (k EventKind) String() string {
@@ -227,9 +248,39 @@ func (ag *AG) Handle(c atparser.Command) Reply {
 		case atparser.Test:
 			return ok("+BIND: (1,2)")
 		case atparser.Read:
-			return ok("+BIND: 1,0", "+BIND: 2,0")
+			// Only the battery level is wanted.
+			return ok("+BIND: 1,0", "+BIND: 2,1")
 		}
 		return errReply()
+	case "+BIEV":
+		p := c.Params()
+		if c.Type != atparser.Set || len(p) != 2 {
+			return errReply()
+		}
+		id, err1 := strconv.Atoi(p[0])
+		v, err2 := strconv.Atoi(p[1])
+		if err1 != nil || err2 != nil {
+			return errReply()
+		}
+		switch {
+		case id == indicatorBattery && v >= 0 && v <= 100:
+			return event(Event{Kind: Battery, Value: v})
+		case id == indicatorSafety && (v == 0 || v == 1):
+			return ok()
+		}
+		return errReply()
+	case "+XAPL":
+		// AT+XAPL=vendor-product-version,features: an accessory that
+		// speaks Apple's extensions; it reports its battery level with
+		// AT+IPHONEACCEV if we say we take it.
+		if c.Type != atparser.Set || len(c.Params()) != 2 {
+			return errReply()
+		}
+		return ok(fmt.Sprintf("+XAPL=iPhone,%d", xaplFeatures))
+	case "+IPHONEACCEV":
+		return ag.accessoryEvents(c)
+	case "+XEVENT":
+		return ag.xevent(c)
 	case "+COPS":
 		switch c.Type {
 		case atparser.Set:
@@ -253,8 +304,7 @@ func (ag *AG) Handle(c atparser.Command) Reply {
 		ag.proposed = 0
 		return event(Event{Kind: CodecSelected, Value: n})
 
-	case "+CMEE", "+CLIP", "+CCWA", "+NREC", "+BIA", "+BIEV", "+BCC",
-		"+XAPL", "+IPHONEACCEV", "+XEVENT", "+CSRSF", "+CSRBATT":
+	case "+CMEE", "+CLIP", "+CCWA", "+NREC", "+BIA", "+BCC", "+CSRSF", "+CSRBATT":
 		if c.Type == atparser.Set || c.Type == atparser.Exec {
 			return ok()
 		}
@@ -315,6 +365,57 @@ func (ag *AG) Handle(c atparser.Command) Reply {
 		return event(Event{Kind: MicGain, Value: n})
 	}
 	return errReply()
+}
+
+// accessoryEvents handles AT+IPHONEACCEV=n,key,value,...: key 1 is the
+// battery level 0..9, reported as 10..100 %; key 2 (docked) and others are
+// ignored.
+func (ag *AG) accessoryEvents(c atparser.Command) Reply {
+	p := c.Params()
+	if c.Type != atparser.Set || len(p) < 1 {
+		return errReply()
+	}
+	n, err := strconv.Atoi(p[0])
+	if err != nil || n < 1 || n > maxAccEvents || len(p) != 1+2*n {
+		return errReply()
+	}
+	level := -1
+	for i := 0; i < n; i++ {
+		key, err1 := strconv.Atoi(p[1+2*i])
+		v, err2 := strconv.Atoi(p[2+2*i])
+		if err1 != nil || err2 != nil {
+			return errReply()
+		}
+		if key == 1 && v >= 0 && v <= 9 {
+			level = (v + 1) * 10
+		}
+	}
+	if level < 0 {
+		return ok()
+	}
+	return event(Event{Kind: Battery, Value: level})
+}
+
+// xevent handles AT+XEVENT, Plantronics' events. Only
+// AT+XEVENT=BATTERY,level,levels,... is used, level as a percentage of
+// levels, as PipeWire reads it; the other events are accepted and ignored.
+func (ag *AG) xevent(c atparser.Command) Reply {
+	p := c.Params()
+	if c.Type != atparser.Set || len(p) == 0 {
+		return errReply()
+	}
+	if p[0] != "BATTERY" {
+		return ok()
+	}
+	if len(p) < 3 {
+		return errReply()
+	}
+	level, err1 := strconv.Atoi(p[1])
+	levels, err2 := strconv.Atoi(p[2])
+	if err1 != nil || err2 != nil || levels < 1 || levels > 1000 || level < 0 || level > levels {
+		return errReply()
+	}
+	return event(Event{Kind: Battery, Value: level * 100 / levels})
 }
 
 // codecList handles AT+BAC, the codecs the headset supports.

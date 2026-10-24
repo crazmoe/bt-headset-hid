@@ -149,7 +149,7 @@ func TestSession(t *testing.T) {
 	go func() { done <- s.Run() }()
 
 	h.send("AT+BRSF=959")
-	h.expect("+BRSF: 36", "OK")
+	h.expect("+BRSF: 1060", "OK")
 	h.send("AT+CIND=?")
 	h.expect(`+CIND: ("service",(0,1)),("call",(0,1)),("callsetup",(0-3)),("callheld",(0-2)),("signal",(0-5)),("roam",(0,1)),("battchg",(0-5))`, "OK")
 	h.send("AT+CIND?")
@@ -196,7 +196,7 @@ func TestSessionCodec(t *testing.T) {
 	defer theirs.Close()
 
 	h.send("AT+BRSF=959")
-	h.expect("+BRSF: 548", "OK")
+	h.expect("+BRSF: 1572", "OK")
 	h.send("AT+BAC=1,2")
 	h.expect("OK")
 	h.send("AT+CIND=?")

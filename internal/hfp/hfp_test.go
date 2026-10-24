@@ -28,7 +28,7 @@ func expectLines(t *testing.T, ag *AG, line string, want ...string) Reply {
 // handshake runs the service level connection setup a typical HFP 1.7 headset sends.
 func handshake(t *testing.T, ag *AG) {
 	t.Helper()
-	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 36", "OK")
+	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 1060", "OK")
 	expectLines(t, ag, "AT+BAC=1,2", "OK")
 	expectLines(t, ag, "AT+CIND=?", cindTest, "OK")
 	expectLines(t, ag, "AT+CIND?", "+CIND: 1,0,0,0,5,0,5", "OK")
@@ -48,7 +48,7 @@ func TestHandshake(t *testing.T) {
 		t.Errorf("HFFeatures = %d", ag.HFFeatures())
 	}
 	// Commands commonly sent right after the handshake.
-	for _, l := range []string{"AT+CMEE=1", "AT+CLIP=1", "AT+CCWA=1", "AT+NREC=0", "AT+COPS=3,0", "AT+CLCC", "AT+XAPL=0B0E-1234-0100,10"} {
+	for _, l := range []string{"AT+CMEE=1", "AT+CLIP=1", "AT+CCWA=1", "AT+NREC=0", "AT+COPS=3,0", "AT+CLCC"} {
 		expectLines(t, ag, l, "OK")
 	}
 	expectLines(t, ag, "AT+COPS?", `+COPS: 0,0,"bt-headset-hid"`, "OK")
@@ -57,7 +57,7 @@ func TestHandshake(t *testing.T) {
 
 func TestHandshakeThreeWay(t *testing.T) {
 	ag := New(HFP, DefaultFeatures|FeatureThreeWay)
-	expectLines(t, ag, "AT+BRSF=1", "+BRSF: 37", "OK")
+	expectLines(t, ag, "AT+BRSF=1", "+BRSF: 1061", "OK")
 	expectLines(t, ag, "AT+CMER=3,0,0,1", "OK")
 	if ag.Connected() {
 		t.Fatal("connected before AT+CHLD=? although both sides support three-way calling")
@@ -159,7 +159,7 @@ func TestSetState(t *testing.T) {
 
 func TestSetStateReportingDisabled(t *testing.T) {
 	ag := New(HFP, DefaultFeatures)
-	expectLines(t, ag, "AT+BRSF=0", "+BRSF: 36", "OK")
+	expectLines(t, ag, "AT+BRSF=0", "+BRSF: 1060", "OK")
 	expectLines(t, ag, "AT+CMER=3,0,0,0", "OK")
 	if lines := ag.SetState(Active); lines != nil {
 		t.Fatalf("+CIEV with reporting disabled: %q", lines)
@@ -167,8 +167,8 @@ func TestSetStateReportingDisabled(t *testing.T) {
 }
 
 func TestEncodeAndGainLines(t *testing.T) {
-	got := string(Encode([]string{"+BRSF: 36", "OK"}))
-	if want := "\r\n+BRSF: 36\r\n\r\nOK\r\n"; got != want {
+	got := string(Encode([]string{"+BRSF: 1060", "OK"}))
+	if want := "\r\n+BRSF: 1060\r\n\r\nOK\r\n"; got != want {
 		t.Errorf("Encode = %q, want %q", got, want)
 	}
 	if Encode(nil) != nil {
@@ -181,7 +181,7 @@ func TestEncodeAndGainLines(t *testing.T) {
 
 func TestCodecNegotiation(t *testing.T) {
 	ag := New(HFP, DefaultFeatures|FeatureCodecNegotiation)
-	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 548", "OK")
+	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 1572", "OK")
 	expectLines(t, ag, "AT+BAC=1,2", "OK")
 	if !ag.CodecNegotiation() {
 		t.Fatal("no codec negotiation")
@@ -220,13 +220,13 @@ func TestCodecNegotiation(t *testing.T) {
 func TestCodecWithoutNegotiation(t *testing.T) {
 	// The headset does not announce codec negotiation (bit 7).
 	ag := New(HFP, DefaultFeatures|FeatureCodecNegotiation)
-	expectLines(t, ag, "AT+BRSF=31", "+BRSF: 548", "OK")
+	expectLines(t, ag, "AT+BRSF=31", "+BRSF: 1572", "OK")
 	if line, codec := ag.ProposeCodec(CodecCVSD, CodecMSBC); line != "" || codec != CodecCVSD {
 		t.Fatalf("ProposeCodec = %q, %d", line, codec)
 	}
 	// Nor do we: mode hfp.
 	ag = New(HFP, DefaultFeatures)
-	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 36", "OK")
+	expectLines(t, ag, "AT+BRSF=959", "+BRSF: 1060", "OK")
 	if ag.CodecNegotiation() {
 		t.Fatal("codec negotiation without the AG feature")
 	}
@@ -241,4 +241,53 @@ func TestCodecListBounds(t *testing.T) {
 		expectLines(t, ag, l, "ERROR")
 	}
 	expectLines(t, ag, "AT+BAC=1,2,3,4,5,6,7,8", "OK")
+}
+
+func TestBattery(t *testing.T) {
+	ag := New(HFP, DefaultFeatures)
+	handshake(t, ag)
+	// HF indicators, HFP 1.7.
+	expectLines(t, ag, "AT+BIND=1,2", "OK")
+	expectLines(t, ag, "AT+BIND=?", "+BIND: (1,2)", "OK")
+	expectLines(t, ag, "AT+BIND?", "+BIND: 1,0", "+BIND: 2,1", "OK")
+	// Apple's extension.
+	expectLines(t, ag, "AT+XAPL=0B0E-1234-0100,10", "+XAPL=iPhone,2", "OK")
+
+	battery := func(line string, want int) {
+		t.Helper()
+		r := expectLines(t, ag, line, "OK")
+		if r.Event == nil || r.Event.Kind != Battery || r.Event.Value != want {
+			t.Errorf("%s -> event %+v, want battery %d", line, r.Event, want)
+		}
+	}
+	battery("AT+BIEV=2,80", 80)
+	battery("AT+BIEV=2,0", 0)
+	battery("AT+IPHONEACCEV=2,1,4,2,0", 50)
+	battery("AT+IPHONEACCEV=1,1,9", 100)
+	battery("AT+XEVENT=BATTERY,6,11,461,0", 54)
+	battery("AT+XEVENT=BATTERY,10,10", 100)
+
+	// Accepted, nothing to report.
+	for _, l := range []string{"AT+BIEV=1,1", "AT+IPHONEACCEV=1,2,0", "AT+IPHONEACCEV=1,1,10", "AT+XEVENT=USER-AGENT,Plantronics"} {
+		r := expectLines(t, ag, l, "OK")
+		if r.Event != nil {
+			t.Errorf("%s -> event %+v", l, r.Event)
+		}
+	}
+	// Malformed or out of range: ERROR, no event.
+	for _, l := range []string{
+		"AT+BIEV=2,101", "AT+BIEV=2,-1", "AT+BIEV=2", "AT+BIEV=3,1", "AT+BIEV=2,x", "AT+BIEV?",
+		"AT+IPHONEACCEV=2,1,4", "AT+IPHONEACCEV=0", "AT+IPHONEACCEV=9,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1",
+		"AT+IPHONEACCEV=1,1,x",
+		"AT+XEVENT=BATTERY,11,10", "AT+XEVENT=BATTERY,1,0", "AT+XEVENT=BATTERY,1", "AT+XEVENT=BATTERY,-1,10",
+		"AT+XAPL=1", "AT+XAPL?",
+	} {
+		r := handle(t, ag, l)
+		if r.Event != nil {
+			t.Errorf("%s -> event %+v", l, r.Event)
+		}
+		if !reflect.DeepEqual(r.Lines, []string{"ERROR"}) {
+			t.Errorf("%s -> %q, want ERROR", l, r.Lines)
+		}
+	}
 }

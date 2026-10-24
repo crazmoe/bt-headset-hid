@@ -243,6 +243,28 @@ func InCall(conn *dbus.Conn) (bool, callswitch.Route, error) {
 	return false, callswitch.Route{}, nil
 }
 
+// Batteries returns the battery levels the daemon publishes in mode ofono,
+// by address, for headsets whose level BlueZ does not show; nil without.
+func Batteries(conn *dbus.Conn) map[string]int {
+	var v dbus.Variant
+	err := conn.Object(ofono.Service, ofono.StatusPath).
+		Call("org.freedesktop.DBus.Properties.Get", dbus.FlagNoAutoStart, ofono.StatusIface, "Batteries").Store(&v)
+	if err != nil {
+		return nil
+	}
+	var bs []ofono.Battery
+	if err := dbus.Store([]any{v.Value()}, &bs); err != nil {
+		return nil
+	}
+	out := map[string]int{}
+	for _, b := range bs {
+		if b.Percent <= 100 {
+			out[strings.ToUpper(b.Address)] = int(b.Percent)
+		}
+	}
+	return out
+}
+
 // Watch subscribes conn to the signals of the daemon (as oFono or as the
 // modem) and of its names, so a caller reading conn's signal channel learns
 // when to check InCall again.

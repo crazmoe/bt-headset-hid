@@ -86,6 +86,14 @@ Voraussetzungen: Linux mit BlueZ und PipeWire mit WirePlumber.
    die Leiste dafür das „XApp-Status-Applet“ (Rechtsklick auf die Leiste, „Applets“); ohne es
    erscheint von keinem Programm ein Tray-Symbol.
 
+   Neben jedem verbundenen Headset zeigt das Menü den Akkustand, wenn er bekannt ist, und unter
+   20 % warnt einmal eine Benachrichtigung. In den Modi `ofono` und `hfp` liest bt-headset-hid den
+   Stand selbst vom Headset (HFP-Indikatoren `AT+BIEV`, Apples `AT+IPHONEACCEV` oder Plantronics'
+   `AT+XEVENT`) und gibt ihn an BlueZ weiter, sodass ihn auch die Bluetooth-Einstellungen des
+   Desktops zeigen; BlueZ-Versionen, die ihn nur mit `--experimental` annehmen, protokollieren
+   `BlueZ does not take the battery level` (im Modus `ofono` zeigt ihn das Tray-Symbol trotzdem).
+   Im Modus `pipewire` liest ihn PipeWire.
+
 2. **Ohne Paket**, auf anderen Distributionen, das Tarball nehmen, entpacken und in den Ordner
    wechseln, oder selbst mit Go bauen:
 

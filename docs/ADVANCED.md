@@ -83,6 +83,13 @@ Requirements: Linux with BlueZ and PipeWire with WirePlumber.
    "Help". On Cinnamon (Linux Mint) the panel needs the "XApp Status Applet" for it (right-click
    the panel, "Applets"); without it no tray icon of any program is shown.
 
+   Next to each connected headset the menu shows its battery level, if known, and below 20 % a
+   notification warns once. In modes `ofono` and `hfp` bt-headset-hid reads the level from the
+   headset itself (HFP indicators `AT+BIEV`, Apple's `AT+IPHONEACCEV` or Plantronics'
+   `AT+XEVENT`) and hands it to BlueZ, so the desktop's Bluetooth settings show it too; BlueZ
+   versions that take it only with `--experimental` log `BlueZ does not take the battery level`
+   (in mode `ofono` the tray still shows it). In mode `pipewire` PipeWire reads it.
+
 2. **Without the package**, on other distributions, take the tarball, unpack it and change into
    the folder, or build it yourself with Go:
 

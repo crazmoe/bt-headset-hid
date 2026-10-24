@@ -149,13 +149,26 @@ func Run(ctx context.Context, cfg Config) error {
 		})
 		logf("serving %s for PipeWire", modem.Service)
 	case ModeHFP:
+		batteries, err := bluez.NewBatteries(conn, logf)
+		if err != nil {
+			return err
+		}
 		ps, err := bluez.Register(conn, hfp.DefaultFeatures, hfp.HFP, hfp.HSP)
 		if err != nil {
 			return err
 		}
 		defer ps.Close()
 		h := &headsets{bridge: b, conns: ps.Connections(), forget: ps.Forget, features: hfp.DefaultFeatures,
-			onEvent: func(_ bluez.Connection, e hfp.Event) { hfpEvent(e) }, logf: logf}
+			onEvent: func(c bluez.Connection, e hfp.Event) {
+				if e.Kind == hfp.Battery {
+					logf("headset %s: battery %d%%", c.Address(), e.Value)
+					batteries.Set(c.Device, e.Value)
+					return
+				}
+				hfpEvent(e)
+			},
+			onClosed: func(c bluez.Connection) { batteries.Remove(c.Device) },
+			logf:     logf}
 		b.OnState(h.setState)
 		go h.serve(ctx)
 		logf("HFP/HSP Audio Gateway registered with BlueZ")
@@ -165,6 +178,10 @@ func Run(ctx context.Context, cfg Config) error {
 			return err
 		}
 		defer srv.Close()
+		batteries, err := bluez.NewBatteries(conn, logf)
+		if err != nil {
+			return err
+		}
 		features := hfp.DefaultFeatures | hfp.FeatureCodecNegotiation
 		ps, err := bluez.Register(conn, features, hfp.HFP, hfp.HSP)
 		if err != nil {
@@ -175,6 +192,13 @@ func Run(ctx context.Context, cfg Config) error {
 		// audio ("bt-headset-hid session" switches it), until the call ends.
 		onEvent := func(c bluez.Connection, e hfp.Event) {
 			switch e.Kind {
+			case hfp.Battery:
+				// To BlueZ, and for "bt-headset-hid session" in case
+				// BlueZ does not take it.
+				logf("headset %s: battery %d%%", c.Address(), e.Value)
+				batteries.Set(c.Device, e.Value)
+				srv.SetBattery(c.Address(), e.Value)
+				return
 			case hfp.Answer, hfp.Button, hfp.Redial, hfp.Dial:
 				srv.SetCallDevice(c.Address())
 			}
@@ -190,6 +214,8 @@ func Run(ctx context.Context, cfg Config) error {
 			}
 		}
 		h.onClosed = func(c bluez.Connection) {
+			batteries.Remove(c.Device)
+			srv.SetBattery(c.Address(), -1)
 			if err := srv.RemoveCard(c.Device); err != nil {
 				logf("headset %s: %v", c.Address(), err)
 			}

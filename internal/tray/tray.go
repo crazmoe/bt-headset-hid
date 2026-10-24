@@ -17,6 +17,9 @@ type Headset struct {
 	Name      string
 	Connected bool
 	Selected  bool // set up for calls
+	// Battery is the battery level in percent, if BatteryKnown.
+	Battery      int
+	BatteryKnown bool
 }
 
 // State is what the tray icon shows.
@@ -91,7 +94,11 @@ func Show(s State) View {
 	var connected []string
 	for _, h := range s.Headsets {
 		if h.Connected && (h.Selected || s.Mode == "hfp") {
-			connected = append(connected, h.name())
+			n := h.name()
+			if h.BatteryKnown {
+				n += fmt.Sprintf(" (%d %%)", h.Battery)
+			}
+			connected = append(connected, n)
 		}
 	}
 	switch {
@@ -123,7 +130,7 @@ func Show(s State) View {
 	case s.Mode == "hfp":
 		add(Item{Label: t(de, "Headsets:", "Headsets:")})
 		for _, h := range s.Headsets {
-			add(Item{Label: h.name() + state(de, h.Connected)})
+			add(Item{Label: h.name() + h.state(de)})
 		}
 	default:
 		add(Item{Label: t(de, "Headsets für Anrufe:", "Headsets for calls:")})
@@ -132,7 +139,7 @@ func Show(s State) View {
 			if h.Selected {
 				c = Checked
 			}
-			add(Item{Label: h.name() + state(de, h.Connected), Enabled: true, Check: c, Action: ToggleHeadset, Arg: h.Address})
+			add(Item{Label: h.name() + h.state(de), Enabled: true, Check: c, Action: ToggleHeadset, Arg: h.Address})
 		}
 	}
 	add(Item{Separator: true})
@@ -147,11 +154,45 @@ func Show(s State) View {
 	return v
 }
 
-func state(de, connected bool) string {
-	if connected {
+// state is the headset's state in the menu: connected, with the battery
+// level if known.
+func (h Headset) state(de bool) string {
+	switch {
+	case h.Connected && h.BatteryKnown:
+		return fmt.Sprintf(t(de, " (verbunden, Akku %d %%)", " (connected, battery %d %%)"), h.Battery)
+	case h.Connected:
 		return t(de, " (verbunden)", " (connected)")
 	}
 	return ""
+}
+
+// Battery levels for the low battery warning: below LowBattery a connected
+// headset is warned about once, until it is back at BatteryOK or more.
+const (
+	LowBattery = 20
+	BatteryOK  = 30
+)
+
+// LowBatteries returns the connected headsets in hs whose battery is low
+// and that were not warned about yet, and the addresses warned about, for
+// the next call.
+func LowBatteries(hs []Headset, warned map[string]bool) ([]Headset, map[string]bool) {
+	var low []Headset
+	now := map[string]bool{}
+	for _, h := range hs {
+		if !h.Connected || !h.BatteryKnown || h.Battery >= BatteryOK {
+			continue
+		}
+		if warned[h.Address] {
+			now[h.Address] = true
+			continue
+		}
+		if h.Battery < LowBattery {
+			low = append(low, h)
+			now[h.Address] = true
+		}
+	}
+	return low, now
 }
 
 // Find returns the item with id in menu.
