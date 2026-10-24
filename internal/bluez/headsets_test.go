@@ -34,6 +34,7 @@ func TestHeadsets(t *testing.T) {
 		"/org/bluez/hci0/dev_00_11_22_33_44_55": device("00:11:22:33:44:55", "Old headset", true, false, UUIDHSPHS),
 		"/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF": device("AA:BB:CC:DD:EE:FF", "Not paired", false, false, UUIDHFPHF),
 	}
+	objs["/org/bluez/hci0/dev_50_C2_75_0D_4E_03"]["org.bluez.Battery1"] = map[string]dbus.Variant{"Percentage": dbus.MakeVariant(byte(80))}
 	if err := conn.Export(objs, "/", "org.freedesktop.DBus.ObjectManager"); err != nil {
 		t.Fatal(err)
 	}
@@ -42,8 +43,8 @@ func TestHeadsets(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Headset{
-		{"00:11:22:33:44:55", "Old headset", false},
-		{"50:C2:75:0D:4E:03", "Jabra Evolve 65", true},
+		{"00:11:22:33:44:55", "Old headset", false, -1},
+		{"50:C2:75:0D:4E:03", "Jabra Evolve 65", true, 80},
 	}
 	if !reflect.DeepEqual(hs, want) {
 		t.Fatalf("Headsets = %v", hs)

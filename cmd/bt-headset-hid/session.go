@@ -221,6 +221,7 @@ func runSession(args []string) error {
 	if err != nil {
 		logger.Printf("tray icon: %v", err)
 	}
+	var warnedLow map[string]bool // headsets warned about a low battery
 	showTray := func() {
 		if icon == nil {
 			return
@@ -230,13 +231,39 @@ func runSession(args []string) error {
 		if err != nil {
 			logger.Printf("paired headsets: %v", err)
 		}
+		// BlueZ shows the battery level if it took it from the daemon;
+		// otherwise the daemon publishes it itself (mode ofono).
+		var own map[string]int
+		if mode == "ofono" {
+			own = desktop.Batteries(sys)
+		}
 		for _, h := range hs {
-			paired = append(paired, tray.Headset{Address: h.Address, Name: h.Name, Connected: h.Connected})
+			th := tray.Headset{Address: h.Address, Name: h.Name, Connected: h.Connected}
+			if p, ok := own[strings.ToUpper(h.Address)]; ok && h.Battery < 0 {
+				h.Battery = p
+			}
+			if h.Battery >= 0 && h.Connected {
+				th.Battery, th.BatteryKnown = h.Battery, true
+			}
+			paired = append(paired, th)
+		}
+		headsets := tray.Headsets(paired, addrs)
+		var low []tray.Headset
+		low, warnedLow = tray.LowBatteries(headsets, warnedLow)
+		for _, h := range low {
+			name := h.Name
+			if name == "" {
+				name = h.Address
+			}
+			notify(message{
+				"Akku fast leer", fmt.Sprintf("%s: noch %d %%", name, h.Battery),
+				"Battery low", fmt.Sprintf("%s: %d %% left", name, h.Battery),
+			})
 		}
 		view = tray.Show(tray.State{
 			Version:  version,
 			Mode:     mode,
-			Headsets: tray.Headsets(paired, addrs),
+			Headsets: headsets,
 			InCall:   sw.InCall() || taken != "",
 			Problems: failures,
 			German:   de,
@@ -480,11 +507,21 @@ func watchPairing(conn *dbus.Conn) error {
 	if err != nil {
 		return err
 	}
-	return conn.AddMatchSignal(
+	err = conn.AddMatchSignal(
 		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
 		dbus.WithMatchMember("PropertiesChanged"),
 		dbus.WithMatchSender("org.bluez"),
 		dbus.WithMatchArg(0, "org.bluez.Device1"),
+	)
+	if err != nil {
+		return err
+	}
+	// The battery level, for the tray icon.
+	return conn.AddMatchSignal(
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchMember("PropertiesChanged"),
+		dbus.WithMatchSender("org.bluez"),
+		dbus.WithMatchArg(0, "org.bluez.Battery1"),
 	)
 }
 

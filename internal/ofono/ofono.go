@@ -44,7 +44,10 @@ const (
 	// StatusPath and StatusIface publish the softphone's call state as the
 	// property CallState: "idle", "incoming", "outgoing" or "active", and
 	// the address of the headset that took the call as CallDevice ("" if
-	// none did, e.g. when it was answered in the softphone).
+	// none did, e.g. when it was answered in the softphone). Batteries
+	// lists the connected headsets with a known battery level, as
+	// (address, percent) sorted by address, for when BlueZ does not take
+	// it (see bluez.Batteries).
 	StatusPath  = dbus.ObjectPath("/bt_headset_hid")
 	StatusIface = "io.github.crazmoe.BtHeadsetHid1"
 )
@@ -84,9 +87,10 @@ type Server struct {
 	logf   func(format string, args ...any)
 	status *prop.Properties
 
-	mu    sync.Mutex
-	cards map[dbus.ObjectPath]*Card
-	agent *agent
+	mu        sync.Mutex
+	cards     map[dbus.ObjectPath]*Card
+	agent     *agent
+	batteries map[string]byte
 }
 
 // Serve exports the audio manager and the call state on conn (normally the
@@ -95,7 +99,7 @@ func Serve(conn *dbus.Conn, logf func(format string, args ...any)) (*Server, err
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
-	s := &Server{conn: conn, logf: logf, cards: map[dbus.ObjectPath]*Card{}}
+	s := &Server{conn: conn, logf: logf, cards: map[dbus.ObjectPath]*Card{}, batteries: map[string]byte{}}
 	if err := conn.Export(manager{s}, ManagerPath, ifaceManager); err != nil {
 		return nil, err
 	}
@@ -106,6 +110,7 @@ func Serve(conn *dbus.Conn, logf func(format string, args ...any)) (*Server, err
 		StatusIface: {
 			"CallState":  {Value: hfp.Idle.String(), Emit: prop.EmitTrue},
 			"CallDevice": {Value: "", Emit: prop.EmitTrue},
+			"Batteries":  {Value: []Battery{}, Emit: prop.EmitTrue},
 		},
 	})
 	if err != nil {
@@ -136,6 +141,30 @@ func (s *Server) SetCallState(st hfp.CallState) {
 // SetCallDevice publishes the headset that took the call, "" for none.
 func (s *Server) SetCallDevice(addr string) {
 	s.status.SetMust(StatusIface, "CallDevice", addr)
+}
+
+// Battery is the battery level of a headset, in the property Batteries.
+type Battery struct {
+	Address string
+	Percent byte
+}
+
+// SetBattery publishes the battery level of the headset addr, or takes it
+// away if percent is negative.
+func (s *Server) SetBattery(addr string, percent int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if percent < 0 || percent > 100 {
+		delete(s.batteries, addr)
+	} else {
+		s.batteries[addr] = byte(percent)
+	}
+	b := make([]Battery, 0, len(s.batteries))
+	for a, p := range s.batteries {
+		b = append(b, Battery{a, p})
+	}
+	sort.Slice(b, func(i, j int) bool { return b[i].Address < b[j].Address })
+	s.status.SetMust(StatusIface, "Batteries", b)
 }
 
 // AddCard offers the audio of the headset with the BlueZ device path device.

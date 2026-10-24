@@ -133,3 +133,53 @@ func TestFailures(t *testing.T) {
 		t.Errorf("Failures = %+v", got)
 	}
 }
+
+func TestShowBattery(t *testing.T) {
+	hs := []Headset{
+		{Address: "AA:AA:AA:AA:AA:AA", Name: "Jabra", Connected: true, Selected: true, Battery: 80, BatteryKnown: true},
+		{Address: "BB:BB:BB:BB:BB:BB", Name: "JBL", Connected: true, Selected: true},
+		{Address: "CC:CC:CC:CC:CC:CC", Name: "Old", Battery: 50, BatteryKnown: true},
+	}
+	v := Show(State{Version: "1", Mode: "ofono", Headsets: hs, German: true})
+	if v.Tooltip != "Jabra (80 %), JBL verbunden" {
+		t.Errorf("tooltip = %q", v.Tooltip)
+	}
+	got := labels(v.Menu)
+	want := []string{"[x] Jabra (verbunden, Akku 80 %)", "[x] JBL (verbunden)", "[ ] Old"}
+	if !reflect.DeepEqual(got[3:6], want) {
+		t.Errorf("menu = %q", got)
+	}
+}
+
+func TestLowBatteries(t *testing.T) {
+	h := func(addr string, connected bool, level int) Headset {
+		return Headset{Address: addr, Connected: connected, Battery: level, BatteryKnown: level >= 0}
+	}
+	var warned map[string]bool
+	steps := []struct {
+		name string
+		hs   []Headset
+		want []string
+	}{
+		{"fine", []Headset{h("A", true, 50), h("B", true, -1)}, nil},
+		{"A low", []Headset{h("A", true, 15), h("B", false, 5)}, []string{"A"}},
+		{"A still low", []Headset{h("A", true, 10)}, nil},
+		{"A a bit better", []Headset{h("A", true, 25)}, nil},
+		{"A low again", []Headset{h("A", true, 18)}, nil},
+		{"A charged", []Headset{h("A", true, 30)}, nil},
+		{"A low after charging", []Headset{h("A", true, 19)}, []string{"A"}},
+		{"A disconnected", []Headset{h("A", false, 19)}, nil},
+		{"A back", []Headset{h("A", true, 19)}, []string{"A"}},
+	}
+	for _, s := range steps {
+		var low []Headset
+		low, warned = LowBatteries(s.hs, warned)
+		var got []string
+		for _, l := range low {
+			got = append(got, l.Address)
+		}
+		if !reflect.DeepEqual(got, s.want) {
+			t.Errorf("%s: warned about %v, want %v", s.name, got, s.want)
+		}
+	}
+}

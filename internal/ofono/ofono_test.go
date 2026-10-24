@@ -146,6 +146,14 @@ func TestServer(t *testing.T) {
 	if err := pw.Object(Service, StatusPath).Call("org.freedesktop.DBus.Properties.Get", 0, StatusIface, "CallDevice").Store(&st); err != nil || st != "84:D3:52:8C:B9:D0" {
 		t.Fatalf("CallDevice = %q, %v", st, err)
 	}
+	srv.SetBattery("84:D3:52:8C:B9:D0", 70)
+	srv.SetBattery("50:C2:75:0D:4E:03", 20)
+	srv.SetBattery("50:C2:75:0D:4E:03", -1)
+	var batteries []Battery
+	if err := pw.Object(Service, StatusPath).Call("org.freedesktop.DBus.Properties.Get", 0, StatusIface, "Batteries").Store(&batteries); err != nil ||
+		len(batteries) != 1 || batteries[0] != (Battery{"84:D3:52:8C:B9:D0", 70}) {
+		t.Fatalf("Batteries = %v, %v", batteries, err)
+	}
 
 	if err := srv.RemoveCard(device); err != nil {
 		t.Fatal(err)

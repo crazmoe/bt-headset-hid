@@ -18,6 +18,7 @@ type Headset struct {
 	Address   string
 	Name      string
 	Connected bool
+	Battery   int // percent, -1 if BlueZ does not know it
 }
 
 // Headsets lists the paired headsets BlueZ knows, sorted by address.
@@ -41,6 +42,10 @@ func Headsets(conn *dbus.Conn) ([]Headset, error) {
 		h.Address, _ = d["Address"].Value().(string)
 		h.Name, _ = d["Alias"].Value().(string)
 		h.Connected, _ = d["Connected"].Value().(bool)
+		h.Battery = -1
+		if p, ok := ifaces["org.bluez.Battery1"]["Percentage"].Value().(byte); ok && p <= 100 {
+			h.Battery = int(p)
+		}
 		hs = append(hs, h)
 	}
 	sort.Slice(hs, func(i, j int) bool { return hs[i].Address < hs[j].Address })
