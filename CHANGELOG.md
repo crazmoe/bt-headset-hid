@@ -8,7 +8,7 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
-## Unreleased
+## 0.6.1
 
 - Battery level of the headsets: in modes ofono and hfp the daemon reads it from the headset
   (HFP indicators `AT+BIEV`, Apple's `AT+IPHONEACCEV`, Plantronics' `AT+XEVENT=BATTERY`) and
