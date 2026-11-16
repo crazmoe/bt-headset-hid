@@ -41,7 +41,7 @@ func Match(name string, bus uint16) bool {
 // __u16 type, __u16 code, __s32 value.
 var eventSize = int(unsafe.Sizeof(timeval{})) + 8
 
-type timeval struct{ sec, usec int } // long, long
+type timeval struct{ _, _ int } // long sec, long usec
 
 // ErrShortEvent means a read returned less than one input event.
 var ErrShortEvent = errors.New("avrcp: short input event")

@@ -5,11 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/crazmoe/bt-headset-hid/internal/doctor"
 	"github.com/crazmoe/bt-headset-hid/internal/install"
+	"github.com/crazmoe/bt-headset-hid/internal/sysfacts"
 )
 
 // runInstall implements "bt-headset-hid install" and "uninstall".
@@ -43,8 +43,7 @@ func runInstall(args []string, uninstall bool) error {
 		mode = chooseMode()
 	}
 	if mode == "pipewire" {
-		out, _ := exec.Command("pipewire", "--version").CombinedOutput()
-		switch err := install.CheckPipeWire(string(out), ""); {
+		switch err := install.CheckPipeWire(sysfacts.Real().PipeWireVersion(), ""); {
 		case errors.Is(err, install.ErrPipeWireTooOld):
 			return fmt.Errorf("%v.\nUse \"sudo bt-headset-hid install -mode ofono\" (or hfp), update PipeWire or run the fix (see docs/ADVANCED.md)", err)
 		case err != nil:
@@ -102,12 +101,12 @@ func chooseMode() string {
 			return m
 		}
 	}
-	out, _ := exec.Command("pipewire", "--version").CombinedOutput()
+	sys := sysfacts.Real()
 	mode, why := install.PickMode(install.System{
-		OFono:        unitState(false, "ofono.service") == doctor.Active,
-		OFonoBackend: ofonoBackend(),
-		PipeWireOK:   install.CheckPipeWire(string(out), "") == nil,
-		ModemManager: unitState(false, "ModemManager.service") == doctor.Active,
+		OFono:        sys.UnitState(false, "ofono.service") == doctor.Active,
+		OFonoBackend: sys.OFonoBackend(),
+		PipeWireOK:   install.CheckPipeWire(sys.PipeWireVersion(), "") == nil,
+		ModemManager: sys.UnitState(false, "ModemManager.service") == doctor.Active,
 	})
 	switch mode {
 	case "ofono":

@@ -75,6 +75,29 @@ func (o Options) binary() string {
 	return Binary
 }
 
+// Hardening is the sandbox of the system service. The daemon reads AT
+// commands from a remote device, so it may only touch what it needs: the
+// system bus (AF_UNIX), SCO audio (AF_BLUETOOTH), /dev/uhid and the AVRCP
+// input device. It writes no files. The package also ships it as a drop-in,
+// so units written by older versions get it too.
+const Hardening = `NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_BLUETOOTH
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+`
+
 // UnitFile returns the systemd unit that runs bin in mode.
 func UnitFile(bin, mode string) []byte {
 	return []byte(`[Unit]
@@ -87,7 +110,7 @@ Wants=bluetooth.service
 ExecStart=` + bin + ` -mode ` + mode + `
 Restart=on-failure
 RestartSec=5
-
+` + Hardening + `
 [Install]
 WantedBy=multi-user.target
 `)
@@ -170,7 +193,9 @@ func PlanUninstall(o Options) []Step {
 	s = append(s,
 		Step{Comment: "stop and disable the service", Try: []string{"systemctl", "disable", "--now", Service}},
 		Step{Remove: Unit},
-		Step{Run: []string{"systemctl", "daemon-reload"}},
+		// Try: without a running systemd (a container, a chroot) the
+		// remaining files must still go.
+		Step{Try: []string{"systemctl", "daemon-reload"}},
 		Step{Remove: UdevRule},
 		Step{Try: []string{"udevadm", "control", "--reload"}},
 		Step{Remove: DBusPolicy},

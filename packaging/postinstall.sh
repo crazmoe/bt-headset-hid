@@ -3,6 +3,7 @@
 # service sets up each user's PipeWire; it starts at every login, and here
 # for the users logged in now.
 if [ -f /etc/systemd/system/bt-headset-hid.service ]; then
+	systemctl daemon-reload || true
 	systemctl try-restart bt-headset-hid.service || true
 	action=try-restart
 else

@@ -126,9 +126,15 @@ PipeWire (or, in mode ofono, over HFP) is dropped, in case the headset reported 
 | `callswitch` | During a call: pause playing media players, switch headsets from A2DP to the phone profile, and back afterwards | none (behind an interface) |
 | `desktop` | I/O of `bt-headset-hid session`: `pw-dump`/`wpctl`, MPRIS on the session bus, the call state on the system bus (oFono name or modem), notifications and the tray icon | commands, D-Bus |
 | `tray` | What the tray icon shows: icon, tooltip and menu from the state of the setup | none |
-| `doctor` | `bt-headset-hid doctor`: findings with fixes from the facts gathered by the command (service, files, BlueZ, conflicting programs, PipeWire, WirePlumber configuration, log lines) | none |
+| `wpsetup` | `bt-headset-hid wireplumber` and the first setup by the session service: writes the `wpconf` files for a mode, chooses the headsets, sets up the user service and restarts PipeWire; commands, BlueZ and the terminal come through `Env` | files (commands behind `Env`) |
+| `session` | `bt-headset-hid session`: the event loop of the user service (calls, pairing, tray menu, checks), setting up newly paired headsets and pointing the speaker and microphone at the connected headset | D-Bus, files, commands |
+| `doctor` | `bt-headset-hid doctor`: findings with fixes from the facts (service, files, BlueZ, conflicting programs, PipeWire, WirePlumber configuration, log lines), and their report | none |
+| `sysfacts` | Gathers the facts for `doctor` and for choosing the mode: systemd, journal, files, `/sys`, BlueZ, PipeWire; every source can be replaced for tests | files, commands, D-Bus |
+| `i18n` | German or English from the locale, and notifications in both | none |
 | `install` | `bt-headset-hid install`/`uninstall`: plan of the system files (binary, uhid, udev rule, D-Bus policy, systemd unit) for a mode, applied by a runner; the choice of the mode when none is given | files, commands |
 | `dbustest` | Private `dbus-daemon` for tests | process |
+
+`cmd/bt-headset-hid` only parses the flags of each command and calls these packages.
 
 ## HID reports
 

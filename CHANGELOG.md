@@ -8,6 +8,20 @@ and report what works and what does not, with your headset model, distribution, 
 version and the output of `journalctl -u bt-headset-hid`, as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
+## Unreleased
+
+- The system service runs in a systemd sandbox (read-only system, no home directories, only
+  D-Bus and Bluetooth sockets, filtered system calls), as it reads AT commands from a remote
+  device. The package adds it as a drop-in, so services set up by older versions get it too.
+- `uninstall` (and removing the package) also removes the udev rule, D-Bus policy and module
+  file when systemd is not running, e.g. in a container.
+- Built with Go 1.27; Go 1.24 no longer gets security fixes. Dependencies updated.
+- CI: checks `gofmt`, runs `staticcheck`, `govulncheck` and `shellcheck`, and builds the
+  packages and installs and removes them in Debian and Fedora on every change.
+- Code: the commands `doctor`, `wireplumber` and `session` moved from `cmd/` into the packages
+  `sysfacts`, `wpsetup`, `session` and `i18n`, with tests; no change in behaviour except that
+  `wireplumber` rejects a wrong `-profile` before it writes anything.
+
 ## 0.6.1
 
 - Battery level of the headsets: in modes ofono and hfp the daemon reads it from the headset

@@ -1,10 +1,11 @@
 // Package doctor checks a bt-headset-hid installation. Facts are gathered by
-// the caller; Check turns them into findings, each with the command that
+// package sysfacts; Check turns them into findings, each with the command that
 // fixes it, in English or German. It does no I/O, so it can be tested.
 package doctor
 
 import (
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 
@@ -471,4 +472,32 @@ func without(all, drop []string) []string {
 		}
 	}
 	return keep
+}
+
+// Report writes the findings as "bt-headset-hid doctor" shows them, in
+// German if de, and reports whether one of them is a failure.
+func Report(w io.Writer, findings []Finding, de bool) (failed bool) {
+	for _, f := range findings {
+		mark := map[Level]string{OK: "✓", Info: "i", Warn: "!", Fail: "✗"}[f.Level]
+		fmt.Fprintf(w, "  %s %s\n", mark, f.Text)
+		if f.Fix != "" && f.Level != OK {
+			if de {
+				fmt.Fprintf(w, "      Lösung: %s\n", f.Fix)
+			} else {
+				fmt.Fprintf(w, "      fix: %s\n", f.Fix)
+			}
+		}
+	}
+	failed = Failed(findings)
+	switch {
+	case failed && de:
+		fmt.Fprintln(w, "Probleme gefunden. Nach dem Beheben erneut prüfen: bt-headset-hid doctor")
+	case failed:
+		fmt.Fprintln(w, "Problems found. After fixing them, check again: bt-headset-hid doctor")
+	case de:
+		fmt.Fprintln(w, "Alles in Ordnung.")
+	default:
+		fmt.Fprintln(w, "All fine.")
+	}
+	return failed
 }

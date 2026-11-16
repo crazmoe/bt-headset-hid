@@ -16,5 +16,39 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: gofmt
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "::error::not formatted with gofmt:"
+            echo "$files"
+            exit 1
+          fi
       - run: go vet ./...
       - run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+      # Known vulnerabilities in the code paths the program uses, in the
+      # dependencies and in the Go standard library.
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - run: shellcheck packaging/*.sh contrib/*.sh
+
+  # Build the release packages and install and remove them in Debian and
+  # Fedora, so packaging mistakes show up before a release.
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: packaging/build.sh 0.0.0
+      - run: docker run --rm -v "$PWD:/src" -w /src debian:stable packaging/test-install.sh deb
+      - run: docker run --rm -v "$PWD:/src" -w /src fedora:latest packaging/test-install.sh rpm
