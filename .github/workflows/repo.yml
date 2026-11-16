@@ -57,6 +57,10 @@ jobs:
         working-directory: site/apt
         run: |
           set -eu
+          # apt-ftparchive is in apt-utils, which the runner image no longer
+          # brings.
+          sudo apt-get update -q
+          sudo apt-get install -y -q apt-utils
           apt-ftparchive packages . > Packages
           gzip -9k Packages
           apt-ftparchive \
@@ -69,7 +73,6 @@ jobs:
       - name: dnf repository
         run: |
           set -eu
-          sudo apt-get update -q
           sudo apt-get install -y -q createrepo-c
           createrepo_c site/rpm
           gpg --batch --yes --local-user "$FPR" --armor --detach-sign --output site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
