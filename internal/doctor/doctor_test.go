@@ -241,3 +241,36 @@ func TestProgramFromUnit(t *testing.T) {
 		}
 	}
 }
+
+func TestReport(t *testing.T) {
+	findings := []Finding{
+		{Level: OK, Text: "service runs", Fix: "not shown"},
+		{Level: Warn, Text: "old copy", Fix: "sudo rm /usr/local/bin/bt-headset-hid"},
+	}
+	var b strings.Builder
+	if Report(&b, findings, false) {
+		t.Error("a warning counted as failure")
+	}
+	want := "  ✓ service runs\n  ! old copy\n      fix: sudo rm /usr/local/bin/bt-headset-hid\nAll fine.\n"
+	if b.String() != want {
+		t.Errorf("Report =\n%s\nwant\n%s", b.String(), want)
+	}
+	b.Reset()
+	findings = append(findings, Finding{Level: Fail, Text: "kein Dienst", Fix: "sudo bt-headset-hid install"})
+	if !Report(&b, findings, true) {
+		t.Error("failure not reported")
+	}
+	if s := b.String(); !strings.Contains(s, "  ✗ kein Dienst\n      Lösung: sudo bt-headset-hid install\n") || !strings.HasSuffix(s, "Probleme gefunden. Nach dem Beheben erneut prüfen: bt-headset-hid doctor\n") {
+		t.Errorf("Report in German =\n%s", s)
+	}
+	b.Reset()
+	Report(&b, findings[:1], true)
+	if !strings.HasSuffix(b.String(), "Alles in Ordnung.\n") {
+		t.Errorf("Report =\n%s", b.String())
+	}
+	b.Reset()
+	Report(&b, findings, false)
+	if !strings.HasSuffix(b.String(), "Problems found. After fixing them, check again: bt-headset-hid doctor\n") {
+		t.Errorf("Report =\n%s", b.String())
+	}
+}

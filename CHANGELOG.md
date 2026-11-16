@@ -18,6 +18,9 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 - Built with Go 1.27; Go 1.24 no longer gets security fixes. Dependencies updated.
 - CI: checks `gofmt`, runs `staticcheck`, `govulncheck` and `shellcheck`, and builds the
   packages and installs and removes them in Debian and Fedora on every change.
+- Code: the commands `doctor`, `wireplumber` and `session` moved from `cmd/` into the packages
+  `sysfacts`, `wpsetup`, `session` and `i18n`, with tests; no change in behaviour except that
+  `wireplumber` rejects a wrong `-profile` before it writes anything.
 
 ## 0.6.1
 
