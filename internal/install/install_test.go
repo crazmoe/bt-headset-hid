@@ -35,6 +35,10 @@ func TestFilesMatchContrib(t *testing.T) {
 	if err != nil || !bytes.Equal(b, UnitFile(Binary, "ofono")) {
 		t.Errorf("contrib unit differs from UnitFile(ofono) (%v)", err)
 	}
+	b, err = os.ReadFile("../../packaging/bt-headset-hid-hardening.conf")
+	if err != nil || !bytes.HasSuffix(b, []byte("\n[Service]\n"+Hardening)) {
+		t.Errorf("packaging/bt-headset-hid-hardening.conf differs from Hardening (%v)", err)
+	}
 }
 
 func TestPlanRejectsMode(t *testing.T) {
