@@ -8,3 +8,7 @@ coverage.*
 profile.cov
 go.work
 .env
+
+# packaging/build.sh
+/build/
+/dist/

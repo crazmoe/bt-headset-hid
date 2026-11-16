@@ -21,42 +21,7 @@ jobs:
       - name: Build
         env:
           TAG: ${{ github.ref_name }}
-        run: |
-          set -eu
-          version="${TAG#v}"
-          mkdir dist
-          for arch in amd64 arm64; do
-            name="bt-headset-hid_${version}_linux_${arch}"
-            mkdir -p "build/$name"
-            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
-              -ldflags "-s -w -X main.version=$version" \
-              -o "build/$name/bt-headset-hid" ./cmd/bt-headset-hid
-            cp -r LICENSE README.md README.de.md CHANGELOG.md contrib "build/$name/"
-            mkdir "build/$name/docs" && cp docs/ADVANCED.md docs/ADVANCED.de.md "build/$name/docs/"
-            tar -C build -czf "dist/$name.tar.gz" "$name"
-          done
-
-      - name: Packages
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -eu
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.1
-          export VERSION="${TAG#v}"
-          # With the repository key, the packages bring the package
-          # repository (see docs/REPOSITORY.md).
-          cp packaging/nfpm.yaml build/nfpm.yaml
-          if [ -f packaging/repo-key.asc ]; then
-            cat packaging/nfpm-repo.yaml >> build/nfpm.yaml
-          fi
-          for ARCH in amd64 arm64; do
-            export ARCH
-            cp "build/bt-headset-hid_${VERSION}_linux_${ARCH}/bt-headset-hid" build/bt-headset-hid
-            for fmt in deb rpm; do
-              "$(go env GOPATH)/bin/nfpm" package -f build/nfpm.yaml -p "$fmt" -t dist/
-            done
-          done
-          (cd dist && sha256sum * > SHA256SUMS)
+        run: packaging/build.sh "${TAG#v}"
 
       - name: Publish
         env:

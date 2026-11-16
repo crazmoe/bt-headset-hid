@@ -115,7 +115,7 @@ func (w *Watcher) scan() {
 			w.mu.Lock()
 			delete(w.open, d.Path)
 			w.mu.Unlock()
-			if err != nil && !errors.Is(err, os.ErrClosed) {
+			if !errors.Is(err, os.ErrClosed) {
 				w.Logf("media keys of %q released: %v", d.Name, err)
 			}
 		}()

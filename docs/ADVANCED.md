@@ -254,3 +254,7 @@ go build ./cmd/bt-headset-hid
 ```
 
 Tests that need `/dev/uhid` (root) or `dbus-daemon` are skipped where those are missing.
+
+The CI also runs `staticcheck`, `govulncheck` and `shellcheck`, and builds the packages with
+`packaging/build.sh 0.0.0` and installs and removes them in Debian and Fedora containers with
+`packaging/test-install.sh deb` (or `rpm`). The release workflow uses the same `build.sh`.
