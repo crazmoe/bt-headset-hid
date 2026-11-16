@@ -2,6 +2,7 @@ package sco
 
 import (
 	"errors"
+	"net"
 	"syscall"
 	"testing"
 	"time"
@@ -72,5 +73,58 @@ func TestWaitTimeout(t *testing.T) {
 	}
 	if err := wait(fds[0], 100*time.Millisecond); err == nil {
 		t.Fatal("no timeout on a full socket")
+	}
+}
+
+func TestDialBadRemote(t *testing.T) {
+	if _, err := Dial("00:1A:7D:DA:71:13", "50:C2:75:0D:4E", false, time.Second); err == nil {
+		t.Fatal("bad remote address accepted")
+	}
+}
+
+// TestDialNoLink dials from an adapter that does not exist. Without
+// Bluetooth in the kernel the socket fails, else bind or connect; either
+// way Dial must fail and leave no descriptor behind.
+func TestDialNoLink(t *testing.T) {
+	for _, transparent := range []bool{false, true} {
+		fd, err := Dial("00:00:00:00:00:01", "50:C2:75:0D:4E:03", transparent, 200*time.Millisecond)
+		if err == nil {
+			syscall.Close(fd)
+			t.Fatalf("Dial(transparent %v) connected without an adapter", transparent)
+		}
+		if fd != -1 {
+			t.Errorf("Dial failed but returned fd %d", fd)
+		}
+	}
+}
+
+// TestWaitRefused checks that a failed connect is reported.
+func TestWaitRefused(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close() // nobody listens there now
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM|syscall.SOCK_NONBLOCK, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Close(fd)
+	err = syscall.Connect(fd, &syscall.SockaddrInet4{Port: port, Addr: [4]byte{127, 0, 0, 1}})
+	if err != nil && err != syscall.EINPROGRESS {
+		if errors.Is(err, syscall.ECONNREFUSED) {
+			t.Skip("connect refused at once")
+		}
+		t.Fatal(err)
+	}
+	if err := wait(fd, 2*time.Second); err == nil {
+		t.Fatal("refused connect reported as success")
+	}
+}
+
+func TestWaitBadFd(t *testing.T) {
+	if err := wait(-1, time.Second); err == nil {
+		t.Fatal("wait on fd -1 succeeded")
 	}
 }

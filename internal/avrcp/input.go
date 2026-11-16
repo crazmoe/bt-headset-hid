@@ -62,6 +62,9 @@ type Watcher struct {
 	Debounce   time.Duration
 	OnEvent    func(hfp.Event)
 	Logf       func(format string, args ...any)
+	// Open opens a device and takes it exclusively; nil means the real
+	// input device (EVIOCGRAB).
+	Open func(path string) (io.ReadCloser, error)
 
 	mu   sync.Mutex
 	open map[string]io.Closer
@@ -100,7 +103,11 @@ func (w *Watcher) scan() {
 		if busy {
 			continue
 		}
-		f, err := grab(d.Path)
+		open := w.Open
+		if open == nil {
+			open = grab
+		}
+		f, err := open(d.Path)
 		if err != nil {
 			w.Logf("media keys: %s: %v", d.Name, err)
 			continue
@@ -124,7 +131,7 @@ func (w *Watcher) scan() {
 
 // grab opens an input device and takes it exclusively, so the desktop and
 // media players no longer see its keys.
-func grab(path string) (*os.File, error) {
+func grab(path string) (io.ReadCloser, error) {
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err

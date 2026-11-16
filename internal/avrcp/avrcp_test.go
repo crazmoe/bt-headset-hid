@@ -1,10 +1,14 @@
 package avrcp
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -106,5 +110,156 @@ func TestServe(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Kind != hfp.Button {
 		t.Fatalf("events %v", got)
+	}
+}
+
+// fakeSysfs makes the sysfs entries of input devices: name and bus type.
+func fakeSysfs(t *testing.T, devs map[string][2]string) string {
+	sys := t.TempDir()
+	for n, d := range devs {
+		dir := filepath.Join(sys, "class/input", n, "device")
+		if err := os.MkdirAll(filepath.Join(dir, "id"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if d[0] != "" {
+			os.WriteFile(filepath.Join(dir, "name"), []byte(d[0]+"\n"), 0o644)
+		}
+		if d[1] != "" {
+			os.WriteFile(filepath.Join(dir, "id/bustype"), []byte(d[1]+"\n"), 0o644)
+		}
+	}
+	return sys
+}
+
+func TestScanSkipsBroken(t *testing.T) {
+	sys := fakeSysfs(t, map[string][2]string{
+		"event1": {"", "0005"},                   // no name
+		"event2": {"Jabra (AVRCP)", ""},          // no bus type
+		"event3": {"Jabra (AVRCP)", "bluetooth"}, // bus type not hex
+		"event4": {"Jabra (AVRCP)", "0005"},
+	})
+	got, err := Scan(sys, "/dev")
+	if err != nil || len(got) != 1 || got[0].Path != "/dev/input/event4" {
+		t.Fatalf("Scan = %+v, %v", got, err)
+	}
+}
+
+// logs collects the log lines of a Watcher.
+type logs struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (l *logs) logf(format string, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.lines = append(l.lines, fmt.Sprintf(format, args...))
+}
+
+func (l *logs) has(s string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, line := range l.lines {
+		if strings.Contains(line, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func eventually(t *testing.T, what string, ok func() bool) {
+	t.Helper()
+	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+		if ok() {
+			return
+		}
+	}
+	t.Fatalf("timed out waiting for %s", what)
+}
+
+func TestWatcher(t *testing.T) {
+	sys := fakeSysfs(t, map[string][2]string{
+		"event3": {"AT Translated Set 2 keyboard", "0011"},
+		"event7": {"Jabra Evolve 65 (AVRCP)", "0005"},
+		"event9": {"JBL (AVRCP)", "0005"},
+	})
+	var mu sync.Mutex
+	opened := map[string]int{}
+	writers := map[string]*os.File{}
+	var events []hfp.Event
+	var l logs
+	w := &Watcher{
+		Sysfs: sys, Dev: "/dev", Interval: 10 * time.Millisecond,
+		OnEvent: func(e hfp.Event) { mu.Lock(); events = append(events, e); mu.Unlock() },
+		Logf:    l.logf,
+		Open: func(path string) (io.ReadCloser, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			opened[path]++
+			if path == "/dev/input/event9" {
+				return nil, errors.New("busy")
+			}
+			r, wr, err := os.Pipe()
+			if err != nil {
+				return nil, err
+			}
+			writers[path] = wr
+			return r, nil
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { w.Run(ctx); close(done) }()
+
+	eventually(t, "the headset grabbed", func() bool { return l.has(`media keys of "Jabra Evolve 65 (AVRCP)" now go to the softphone`) })
+	if !l.has("JBL (AVRCP): busy") {
+		t.Errorf("failed grab not logged: %q", l.lines)
+	}
+	mu.Lock()
+	wr := writers["/dev/input/event7"]
+	mu.Unlock()
+	wr.Write(append(event(evKey, keyPlayPause, 1), event(evKey, keyPlayPause, 0)...))
+	eventually(t, "the key press", func() bool { mu.Lock(); defer mu.Unlock(); return len(events) == 1 })
+
+	// While it is open, later scans leave it alone.
+	time.Sleep(50 * time.Millisecond)
+	mu.Lock()
+	if n := opened["/dev/input/event7"]; n != 1 {
+		t.Errorf("opened %d times while open", n)
+	}
+	mu.Unlock()
+
+	// When the device goes away, it is released and taken again once it is
+	// back.
+	wr.Close()
+	eventually(t, "the release", func() bool { return l.has(`media keys of "Jabra Evolve 65 (AVRCP)" released`) })
+	eventually(t, "the second grab", func() bool { mu.Lock(); defer mu.Unlock(); return opened["/dev/input/event7"] == 2 })
+
+	cancel()
+	<-done
+}
+
+func TestWatcherBadSysfs(t *testing.T) {
+	var l logs
+	w := &Watcher{Sysfs: "[", Dev: "/dev", Interval: time.Hour, Logf: l.logf}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w.Run(ctx)
+	if !l.has("media keys:") {
+		t.Errorf("bad pattern not logged: %q", l.lines)
+	}
+}
+
+func TestGrabFails(t *testing.T) {
+	if _, err := grab(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Error("grab of a missing device succeeded")
+	}
+	// A plain file is no input device: EVIOCGRAB fails.
+	p := filepath.Join(t.TempDir(), "event0")
+	if err := os.WriteFile(p, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := grab(p); err == nil || !strings.Contains(err.Error(), "EVIOCGRAB") {
+		t.Errorf("grab of a plain file: %v", err)
 	}
 }

@@ -22,7 +22,7 @@ func TestGerman(t *testing.T) {
 }
 
 func TestPick(t *testing.T) {
-	m := Message{"Akku", "leer", "Battery", "empty"}
+	m := New("Akku", "leer", "Battery", "empty")
 	if s, b := m.Pick(true); s != "Akku" || b != "leer" {
 		t.Errorf("Pick(true) = %q, %q", s, b)
 	}
