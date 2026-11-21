@@ -264,3 +264,10 @@ Tests, die `/dev/uhid` (root) oder `dbus-daemon` brauchen, werden übersprungen,
 Die CI prüft zusätzlich mit `staticcheck`, `govulncheck` und `shellcheck`, baut die Pakete mit
 `packaging/build.sh 0.0.0` und installiert und entfernt sie in Debian- und Fedora-Containern mit
 `packaging/test-install.sh deb` (oder `rpm`). Der Release-Workflow nutzt dasselbe `build.sh`.
+
+Lizenzen: Das Programm enthält die genutzten Go-Module und die Go-Standardbibliothek, deshalb
+liegen deren Lizenzhinweise in `THIRD_PARTY_LICENSES` und, für das deb-Paket, in
+`packaging/copyright` (Debians maschinenlesbares Format). `build.sh` ruft
+`packaging/check-licenses.sh` auf, das beide Dateien mit `go version -m` der gebauten Programme
+vergleicht und abbricht, wenn ein Modul, seine Version oder sein Lizenztext fehlt. Wer eine
+Abhängigkeit hinzufügt oder aktualisiert, ergänzt ihre Hinweise in beiden Dateien.

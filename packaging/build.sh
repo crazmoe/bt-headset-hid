@@ -3,7 +3,7 @@
 # amd64 and arm64 into dist/. Used by .github/workflows/release.yml and, to
 # catch packaging mistakes before a release, by ci.yml.
 #
-#   packaging/build.sh 0.6.1
+#   packaging/build.sh 1.0.0
 set -eu
 version=${1:?usage: packaging/build.sh VERSION}
 cd "$(dirname "$0")/.."
@@ -16,10 +16,13 @@ for arch in amd64 arm64; do
 	CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
 		-ldflags "-s -w -X main.version=$version" \
 		-o "build/$name/bt-headset-hid" ./cmd/bt-headset-hid
-	cp -r LICENSE README.md README.de.md CHANGELOG.md contrib "build/$name/"
+	cp -r LICENSE THIRD_PARTY_LICENSES README.md README.de.md CHANGELOG.md contrib "build/$name/"
 	cp docs/ADVANCED.md docs/ADVANCED.de.md "build/$name/docs/"
 	tar -C build -czf "dist/$name.tar.gz" "$name"
 done
+# THIRD_PARTY_LICENSES and packaging/copyright must cover what went into the
+# programs.
+packaging/check-licenses.sh build/bt-headset-hid_"${version}"_linux_*/bt-headset-hid
 
 go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.49.0
 nfpm="$(go env GOPATH)/bin/nfpm"

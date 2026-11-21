@@ -1,15 +1,16 @@
 # Changelog
 
-## Beta testers wanted
+## 1.0.0
 
-bt-headset-hid is beta software. If you have a Bluetooth headset
-and use a softphone (Teams, Zoom, a WebHID browser app, ...), please try it in your daily work
-and report what works and what does not, with your headset model, distribution, PipeWire
-version and the output of `journalctl -u bt-headset-hid`, as a
+First stable release; no problems were reported during the beta. Reports of headsets and softphones that work,
+or do not, are still welcome as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
 
-## Unreleased
-
+- License notices of the third-party code built into the program (the D-Bus library godbus and
+  the Go standard library, under BSD licenses) in `THIRD_PARTY_LICENSES`, shipped in the
+  archives and packages; the deb package also has `/usr/share/doc/bt-headset-hid/copyright` in
+  Debian's machine-readable format, the rpm package marks the license files as `%license`. The
+  build stops when a dependency's notices are missing.
 - The system service runs in a systemd sandbox (read-only system, no home directories, only
   D-Bus and Bluetooth sockets, filtered system calls), as it reads AT commands from a remote
   device. The package adds it as a drop-in, so services set up by older versions get it too.
