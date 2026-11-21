@@ -31,6 +31,17 @@ for f in \
 	/usr/share/doc/bt-headset-hid/README.md; do
 	[ -f "$f" ] || fail "$f is missing"
 done
+# License texts, where each format keeps them.
+case "$fmt" in
+deb) licenses="/usr/share/doc/bt-headset-hid/copyright
+/usr/share/doc/bt-headset-hid/LICENSE
+/usr/share/doc/bt-headset-hid/THIRD_PARTY_LICENSES" ;;
+rpm) licenses="/usr/share/licenses/bt-headset-hid/LICENSE
+/usr/share/licenses/bt-headset-hid/THIRD_PARTY_LICENSES" ;;
+esac
+for f in $licenses; do
+	[ -f "$f" ] || fail "$f is missing"
+done
 # postinstall ran "bt-headset-hid install -system-only".
 setup="/etc/systemd/system/bt-headset-hid.service
 /etc/udev/rules.d/70-bt-headset-hid.rules

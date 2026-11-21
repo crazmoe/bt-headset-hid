@@ -1,0 +1,197 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: bt-headset-hid
+Upstream-Contact: https://github.com/crazmoe/bt-headset-hid/issues
+Source: https://github.com/crazmoe/bt-headset-hid
+Comment: /usr/bin/bt-headset-hid is a statically linked Go program (built
+ without cgo). Besides bt-headset-hid's own code it contains the Go modules
+ and the parts of the Go standard library and runtime named below; the Files
+ fields of those paragraphs name their Go import paths. The same notices are
+ in /usr/share/doc/bt-headset-hid/THIRD_PARTY_LICENSES.
+
+Files: *
+Copyright: 2026 Crazmoe
+License: Expat
+
+Files: github.com/godbus/dbus/v5/*
+Copyright: 2013 Georg Reinke <guelfey@gmail.com>, Google
+License: BSD-2-clause
+Comment: github.com/godbus/dbus/v5 v5.2.4, https://github.com/godbus/dbus
+
+Files: go/src/*
+Copyright: 2009 The Go Authors
+License: BSD-3-clause-Go
+Comment: The Go standard library and runtime (https://go.dev), including the
+ golang.org/x/... packages vendored into it, which are under the same license.
+ Google's additional patent grant for Go (file PATENTS):
+ .
+ Additional IP Rights Grant (Patents)
+ .
+ "This implementation" means the copyrightable works distributed by
+ Google as part of the Go project.
+ .
+ Google hereby grants to You a perpetual, worldwide, non-exclusive,
+ no-charge, royalty-free, irrevocable (except as stated in this section)
+ patent license to make, have made, use, offer to sell, sell, import,
+ transfer and otherwise run, modify and propagate the contents of this
+ implementation of Go, where such license applies only to those patent
+ claims, both currently owned or controlled by Google and acquired in
+ the future, licensable by Google that are necessarily infringed by this
+ implementation of Go.  This grant does not include claims that would be
+ infringed only as a consequence of further modification of this
+ implementation.  If you or your agent or exclusive licensee institute or
+ order or agree to the institution of patent litigation against any
+ entity (including a cross-claim or counterclaim in a lawsuit) alleging
+ that this implementation of Go or any code incorporated within this
+ implementation of Go constitutes direct or contributory patent
+ infringement, or inducement of patent infringement, then any patent
+ rights granted to you under this License for this implementation of Go
+ shall terminate as of the date such litigation is filed.
+
+Files: go/src/runtime/memmove_amd64.s
+Copyright: 1994-1999 Lucent Technologies Inc.
+ 2000-2007 Vita Nuova Holdings Limited (www.vitanuova.com)
+ 2009 The Go Authors
+License: Expat
+Comment: Derived from Inferno's libkern/memmove-386.s; the file's notice:
+ .
+         Copyright © 1994-1999 Lucent Technologies Inc. All rights reserved.
+         Revisions Copyright © 2000-2007 Vita Nuova Holdings Limited (www.vitanuova.com).  All rights reserved.
+         Portions Copyright 2009 The Go Authors. All rights reserved.
+ .
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+
+Files: go/src/math/acosh.go go/src/math/asinh.go go/src/math/atanh.go
+ go/src/math/cbrt.go go/src/math/erf.go go/src/math/exp.go go/src/math/expm1.go
+ go/src/math/j0.go go/src/math/j1.go go/src/math/jn.go go/src/math/lgamma.go
+ go/src/math/log.go go/src/math/log1p.go go/src/math/remainder.go
+ go/src/math/sqrt.go
+Copyright: 2009 The Go Authors
+ 1993, 2004 Sun Microsystems, Inc.
+License: BSD-3-clause-Go and SunPro
+Comment: Derived from FreeBSD's msun.
+
+Files: go/src/math/atan.go go/src/math/gamma.go go/src/math/sin.go
+ go/src/math/tan.go go/src/math/tanh.go
+Copyright: 2009 The Go Authors
+ 1984, 1987, 1989, 1992, 2000 Stephen L. Moshier
+License: BSD-3-clause-Go and Cephes
+Comment: Derived from the Cephes Math Library 2.8.
+
+License: Expat
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
+License: BSD-2-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ .
+ 1. Redistributions of source code must retain the above copyright notice,
+ this list of conditions and the following disclaimer.
+ .
+ 2. Redistributions in binary form must reproduce the above copyright
+ notice, this list of conditions and the following disclaimer in the
+ documentation and/or other materials provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: BSD-3-clause-Go
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are
+ met:
+ .
+    * Redistributions of source code must retain the above copyright
+ notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above
+ copyright notice, this list of conditions and the following disclaimer
+ in the documentation and/or other materials provided with the
+ distribution.
+    * Neither the name of Google LLC nor the names of its
+ contributors may be used to endorse or promote products derived from
+ this software without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: SunPro
+ Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ .
+ Developed at SunPro, a Sun Microsystems, Inc. business.
+ Permission to use, copy, modify, and distribute this
+ software is freely granted, provided that this notice
+ is preserved.
+ .
+ Copyright (C) 2004 by Sun Microsystems, Inc. All rights reserved.
+ .
+ Permission to use, copy, modify, and distribute this
+ software is freely granted, provided that this notice
+ is preserved.
+
+License: Cephes
+ Cephes Math Library Release 2.8:  June, 2000
+ Copyright 1984, 1987, 1989, 1992, 2000 by Stephen L. Moshier
+ .
+ The readme file at http://netlib.sandia.gov/cephes/ says:
+    Some software in this archive may be from the book _Methods and
+ Programs for Mathematical Functions_ (Prentice-Hall or Simon & Schuster
+ International, 1989) or from the Cephes Mathematical Library, a
+ commercial product. In either event, it is copyrighted by the author.
+ What you see here may be used freely but it comes with no support or
+ guarantee.
+ .
+   The two known misprints in the book are repaired here in the
+ source listings for the gamma function and the incomplete beta
+ integral.
+ .
+   Stephen L. Moshier
+   moshier@na-net.ornl.gov

@@ -70,4 +70,6 @@ Please report security problems privately, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE). The program also contains third-party code under BSD licenses (the
+D-Bus library godbus and the Go standard library); their notices are in
+[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).

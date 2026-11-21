@@ -10,6 +10,11 @@ version and the output of `journalctl -u bt-headset-hid`, as a
 
 ## Unreleased
 
+- License notices of the third-party code built into the program (the D-Bus library godbus and
+  the Go standard library, under BSD licenses) in `THIRD_PARTY_LICENSES`, shipped in the
+  archives and packages; the deb package also has `/usr/share/doc/bt-headset-hid/copyright` in
+  Debian's machine-readable format, the rpm package marks the license files as `%license`. The
+  build stops when a dependency's notices are missing.
 - The system service runs in a systemd sandbox (read-only system, no home directories, only
   D-Bus and Bluetooth sockets, filtered system calls), as it reads AT commands from a remote
   device. The package adds it as a drop-in, so services set up by older versions get it too.

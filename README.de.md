@@ -72,4 +72,6 @@ Sicherheitsprobleme bitte vertraulich melden, siehe [SECURITY.md](SECURITY.md).
 
 ## Lizenz
 
-MIT
+MIT, siehe [LICENSE](LICENSE). Das Programm enthält außerdem Code Dritter unter BSD-Lizenzen (die
+D-Bus-Bibliothek godbus und die Go-Standardbibliothek); deren Hinweise stehen in
+[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).

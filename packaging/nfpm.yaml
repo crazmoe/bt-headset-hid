@@ -48,8 +48,26 @@ contents:
     dst: /usr/share/doc/bt-headset-hid/ADVANCED.de.md
   - src: CHANGELOG.md
     dst: /usr/share/doc/bt-headset-hid/CHANGELOG.md
+  # License texts: bt-headset-hid's own and those of the third-party code
+  # built into the program. Debian keeps /usr/share/doc/*/copyright even
+  # where it leaves out documentation; rpm marks the files as %license.
   - src: LICENSE
     dst: /usr/share/doc/bt-headset-hid/LICENSE
+    packager: deb
+  - src: THIRD_PARTY_LICENSES
+    dst: /usr/share/doc/bt-headset-hid/THIRD_PARTY_LICENSES
+    packager: deb
+  - src: packaging/copyright
+    dst: /usr/share/doc/bt-headset-hid/copyright
+    packager: deb
+  - src: LICENSE
+    dst: /usr/share/licenses/bt-headset-hid/LICENSE
+    type: license
+    packager: rpm
+  - src: THIRD_PARTY_LICENSES
+    dst: /usr/share/licenses/bt-headset-hid/THIRD_PARTY_LICENSES
+    type: license
+    packager: rpm
   - src: contrib/
     dst: /usr/share/doc/bt-headset-hid/contrib/
     type: tree
