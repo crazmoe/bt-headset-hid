@@ -5,8 +5,8 @@
 Makes the buttons of a Bluetooth headset (e.g. Jabra) work in softphones like Teams, Zoom or
 browser apps, as with a USB headset dongle: answer, hang up and talk through the headset.
 
-**Status:** beta. Requirements: Linux with Bluetooth and PipeWire (the default sound system of
-current distributions).
+Requirements: Linux with Bluetooth and PipeWire (the default sound system of current
+distributions).
 
 ## In 3 steps
 

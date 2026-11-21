@@ -1,14 +1,10 @@
 # Changelog
 
-## Beta testers wanted
+## 1.0.0
 
-bt-headset-hid is beta software. If you have a Bluetooth headset
-and use a softphone (Teams, Zoom, a WebHID browser app, ...), please try it in your daily work
-and report what works and what does not, with your headset model, distribution, PipeWire
-version and the output of `journalctl -u bt-headset-hid`, as a
+First stable release; no problems were reported during the beta. Reports of headsets and softphones that work,
+or do not, are still welcome as a
 [GitHub issue](https://github.com/crazmoe/bt-headset-hid/issues).
-
-## Unreleased
 
 - License notices of the third-party code built into the program (the D-Bus library godbus and
   the Go standard library, under BSD licenses) in `THIRD_PARTY_LICENSES`, shipped in the

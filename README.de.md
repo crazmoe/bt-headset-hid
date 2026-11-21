@@ -6,7 +6,7 @@ Macht die Tasten eines Bluetooth-Headsets (z. B. Jabra) in Softphones wie Teams,
 Browser-Apps nutzbar, so wie mit einem USB-Headset-Dongle: annehmen, auflegen und über das
 Headset sprechen.
 
-**Status:** Beta. Voraussetzungen: Linux mit Bluetooth und PipeWire (das Standard-Tonsystem
+Voraussetzungen: Linux mit Bluetooth und PipeWire (das Standard-Tonsystem
 aktueller Distributionen).
 
 ## In 3 Schritten
